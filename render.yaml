@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: booking-system
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/resources
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "1"
+      # Note: on the free plan the filesystem is ephemeral, so the SQLite
+      # database resets on each deploy/restart. Attach a persistent disk
+      # (paid plans) mounted at /data and set DATA_DIR=/data to keep data.

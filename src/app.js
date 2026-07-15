@@ -14,6 +14,12 @@ const app = express();
 // Do not advertise the framework.
 app.disable('x-powered-by');
 
+// On hosting platforms the app sits behind exactly one TLS-terminating proxy;
+// trusting it makes Secure cookies and per-client rate limiting work correctly.
+if (process.env.TRUST_PROXY === '1') {
+  app.set('trust proxy', 1);
+}
+
 // Security headers, including a strict same-origin CSP (no inline scripts).
 app.use(
   helmet({

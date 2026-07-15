@@ -65,4 +65,23 @@ The application was built to eliminate the common web vulnerability classes:
 - **Secrets** — no credentials or secrets in the codebase; admin credentials are supplied via environment variables; the database and `.env` are git-ignored.
 - **Input validation** — every field (email, name, password, date, slot, ids) is validated server-side with strict allow-lists; calendar dates are verified as real dates within the booking window.
 
-For production deployment, run behind TLS (the `Secure` cookie flag activates with `NODE_ENV=production`) and set `HOST`/`PORT` as needed (the server binds to `127.0.0.1` by default).
+For production deployment, run behind TLS (the `Secure` cookie flag activates with `NODE_ENV=production`) and set `HOST`/`PORT` as needed (the server binds to `127.0.0.1` by default). When behind a single reverse proxy (Render, Railway, Heroku, nginx), set `TRUST_PROXY=1` so secure cookies and per-client rate limiting work correctly.
+
+## Deploying (go live)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/nonuprateek1996-ai/Booking-system)
+
+**Render (one click, free):** click the button above, sign in with GitHub, and Render reads `render.yaml` and deploys automatically. You'll get a public `https://booking-system-XXXX.onrender.com` URL. On the free plan the SQLite file is ephemeral (data resets on redeploys); attach a persistent disk mounted at `/data` and set `DATA_DIR=/data` to keep data permanently.
+
+**Any Docker host (Railway, Fly.io, a VPS):** a production `Dockerfile` is included:
+
+```bash
+docker build -t booking-system .
+docker run -p 3000:3000 -v booking-data:/data booking-system
+```
+
+To create the admin account on a deployed instance, run in the host's shell:
+
+```bash
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a-strong-password' npm run create-admin
+```
