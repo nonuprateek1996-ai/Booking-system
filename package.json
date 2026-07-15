@@ -1,0 +1,24 @@
+{
+  "name": "booking-system",
+  "version": "1.0.0",
+  "description": "A secure room/resource booking system with user accounts, slot management, and an admin role.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "create-admin": "node scripts/create-admin.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0"
+  }
+}

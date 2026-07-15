@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking System</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Booking System</h1>
+    <div id="user-box" hidden>
+      <span id="user-name"></span>
+      <button id="logout-btn" class="link-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <p id="message" role="alert" hidden></p>
+
+    <!-- Auth panel -->
+    <section id="auth-panel">
+      <div class="card">
+        <h2 id="auth-title">Sign in</h2>
+        <form id="auth-form" autocomplete="on">
+          <label id="name-row" hidden>
+            Name
+            <input type="text" id="auth-name" maxlength="100" autocomplete="name">
+          </label>
+          <label>
+            Email
+            <input type="email" id="auth-email" required maxlength="254" autocomplete="email">
+          </label>
+          <label>
+            Password
+            <input type="password" id="auth-password" required minlength="8" maxlength="72"
+                   autocomplete="current-password">
+          </label>
+          <button type="submit" id="auth-submit">Sign in</button>
+        </form>
+        <p>
+          <span id="auth-toggle-text">Need an account?</span>
+          <button id="auth-toggle" class="link-btn">Register</button>
+        </p>
+      </div>
+    </section>
+
+    <!-- Booking panel -->
+    <section id="booking-panel" hidden>
+      <div class="card">
+        <h2>Book a resource</h2>
+        <form id="booking-form">
+          <label>
+            Resource
+            <select id="resource-select" required></select>
+          </label>
+          <label>
+            Date
+            <input type="date" id="date-input" required>
+          </label>
+          <label>
+            Time slot
+            <select id="slot-select" required></select>
+          </label>
+          <button type="submit">Book</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>My bookings</h2>
+        <ul id="bookings-list"></ul>
+        <p id="no-bookings" hidden>You have no bookings yet.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
