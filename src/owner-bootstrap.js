@@ -66,22 +66,51 @@ function ensureOwner({ email, password, name = 'Owner', force = false }) {
 // Startup hook: provisions from OWNER_EMAIL / OWNER_PASSWORD when both are
 // set. OWNER_FORCE_RESET=1 turns a boot into an explicit password reset —
 // remove it again afterwards, or every restart revokes the owner's sessions.
+function ownerExists() {
+  return Boolean(db.prepare("SELECT 1 FROM users WHERE role IN ('owner', 'admin')").get());
+}
+
+// Always reports its outcome. Silence would be ambiguous — an operator could
+// not tell "variables not set" from "account already existed" — so every
+// path below logs exactly one line. Credentials are never logged.
 function ensureOwnerFromEnv() {
   const email = process.env.OWNER_EMAIL;
   const password = process.env.OWNER_PASSWORD;
+
   if (!email && !password) {
-    return null; // not configured; scripts/create-owner.js is the other path
+    if (ownerExists()) {
+      console.log('Owner bootstrap: OWNER_EMAIL/OWNER_PASSWORD not set; existing owner account kept.');
+    } else {
+      console.warn(
+        'Owner bootstrap: NO OWNER ACCOUNT EXISTS and OWNER_EMAIL/OWNER_PASSWORD are not set. ' +
+          'Set both in the environment (or run `npm run create-owner`) or nobody can sign in to manage the site.'
+      );
+    }
+    return null;
   }
+
+  if (!email || !password) {
+    console.error(
+      `Owner bootstrap: only ${email ? 'OWNER_EMAIL' : 'OWNER_PASSWORD'} is set — both are required.`
+    );
+    return { ok: false, reason: 'incomplete configuration' };
+  }
+
   const result = ensureOwner({
     email,
     password,
     name: process.env.OWNER_NAME || 'Owner',
     force: process.env.OWNER_FORCE_RESET === '1',
   });
-  // Log outcomes without ever logging the credentials themselves.
+
   if (!result.ok) {
     console.error(`Owner bootstrap: ${result.reason}`);
-  } else if (result.action !== 'unchanged') {
+  } else if (result.action === 'unchanged') {
+    console.log(
+      'Owner bootstrap: owner account already exists and was left unchanged ' +
+        '(set OWNER_FORCE_RESET=1 for one deploy to rotate the password).'
+    );
+  } else {
     console.log(`Owner bootstrap: account ${result.action}.`);
   }
   return result;
