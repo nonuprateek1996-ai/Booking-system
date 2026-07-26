@@ -17,9 +17,26 @@
     <h1>Find a place to stay</h1>
     <p>Browse homes, cottages and villas. No account needed to look around.</p>
     <form id="search-form" class="search">
-      <input type="search" id="q" placeholder="Where to? Try “Goa”" maxlength="100" aria-label="Search by place or title">
-      <input type="number" id="guests" placeholder="Guests" min="1" max="50" aria-label="Guests">
-      <input type="number" id="maxPrice" placeholder="Max ₹ / night" min="1" step="100" aria-label="Maximum price per night">
+      <label class="search-field">
+        <span>Where</span>
+        <input type="search" id="q" placeholder="Anywhere" maxlength="100">
+      </label>
+      <label class="search-field">
+        <span>Check in</span>
+        <input type="date" id="checkIn">
+      </label>
+      <label class="search-field">
+        <span>Check out</span>
+        <input type="date" id="checkOut">
+      </label>
+      <label class="search-field narrow">
+        <span>Guests</span>
+        <input type="number" id="guests" placeholder="Any" min="1" max="50">
+      </label>
+      <label class="search-field narrow">
+        <span>Max ₹/night</span>
+        <input type="number" id="maxPrice" placeholder="Any" min="1" step="500">
+      </label>
       <button type="submit">Search</button>
     </form>
   </section>

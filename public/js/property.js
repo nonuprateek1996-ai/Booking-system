@@ -4,7 +4,8 @@ import {
   api, el, money, formatDate, nightsBetween, todayIso, showMessage, initPage,
 } from './common.js';
 
-const propertyId = new URLSearchParams(window.location.search).get('id');
+const query = new URLSearchParams(window.location.search);
+const propertyId = query.get('id');
 let property = null;
 let user = null;
 
@@ -74,6 +75,15 @@ function setupBookingForm() {
     updateTotal();
   });
   checkOut.addEventListener('change', updateTotal);
+
+  // Dates carried over from the search arrive pre-filled and priced.
+  const fromSearch = { checkIn: query.get('checkIn'), checkOut: query.get('checkOut') };
+  if (fromSearch.checkIn && fromSearch.checkOut) {
+    checkIn.value = fromSearch.checkIn;
+    checkOut.value = fromSearch.checkOut;
+    checkOut.min = fromSearch.checkIn;
+    updateTotal();
+  }
 
   // Owners and signed-out visitors see the listing but cannot book here.
   if (!user) {

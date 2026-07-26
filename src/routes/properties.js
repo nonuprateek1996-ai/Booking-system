@@ -31,9 +31,29 @@ function imageIdsFor(propertyId) {
 // --- Public browsing (no authentication) ---
 
 router.get('/properties', (req, res) => {
-  const { q, maxPrice, guests } = req.query;
+  const { q, maxPrice, guests, checkIn, checkOut } = req.query;
   const clauses = ['p.published = 1'];
   const params = [];
+  let nights = null;
+
+  // "Where + when + how many": when dates are supplied, listings already
+  // taken for any part of the stay are excluded from the results entirely.
+  const wantsDates = (checkIn ?? '') !== '' || (checkOut ?? '') !== '';
+  if (wantsDates) {
+    if ((checkIn ?? '') === '' || (checkOut ?? '') === '') {
+      return res.status(400).json({ error: 'Provide both a check-in and a check-out date' });
+    }
+    const stay = v.validateStay(checkIn, checkOut);
+    if (stay.error) {
+      return res.status(400).json({ error: stay.error });
+    }
+    nights = stay.nights;
+    clauses.push(`NOT EXISTS (
+      SELECT 1 FROM bookings b
+       WHERE b.property_id = p.id AND b.check_in < ? AND b.check_out > ?
+    )`);
+    params.push(checkOut, checkIn);
+  }
 
   if (typeof q === 'string' && q.trim() !== '') {
     if (q.length > 100) {
@@ -69,7 +89,16 @@ router.get('/properties', (req, res) => {
     )
     .all(...params);
 
-  res.json({ properties });
+  // With dates chosen, quote the whole stay the way a traveller thinks about
+  // it, not just the nightly rate.
+  if (nights !== null) {
+    for (const p of properties) {
+      p.nights = nights;
+      p.stayTotal = p.pricePerNight * nights;
+    }
+  }
+
+  res.json({ properties, nights });
 });
 
 router.get('/properties/:id', (req, res) => {

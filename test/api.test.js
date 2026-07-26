@@ -159,6 +159,73 @@ test('unpublished properties are hidden from the public listing and detail view'
   assert.strictEqual(ownerView.status, 200);
 });
 
+// --- Availability-aware search: "where + when + how many" ---
+
+test('searching with dates hides listings already booked for those nights', async () => {
+  const owner = await makeOwner('search-owner@example.com');
+  const id = await makeProperty(owner, { title: 'Weekend Barn', location: 'Searchford' });
+  const guest = await makeGuest('search-guest@example.com');
+
+  const anon = client();
+  let r = await anon('GET', `/api/properties?q=Searchford&checkIn=${dateIn(200)}&checkOut=${dateIn(204)}`);
+  assert.strictEqual(r.data.properties.length, 1, 'free before anyone books');
+
+  const booked = await guest('POST', '/api/bookings', {
+    propertyId: id,
+    checkIn: dateIn(201),
+    checkOut: dateIn(203),
+  });
+  assert.strictEqual(booked.status, 201);
+
+  // Overlapping the booked nights: the listing must disappear.
+  r = await anon('GET', `/api/properties?q=Searchford&checkIn=${dateIn(200)}&checkOut=${dateIn(204)}`);
+  assert.strictEqual(r.data.properties.length, 0, 'a booked listing is not offered');
+
+  // Dates entirely clear of the booking: still bookable.
+  r = await anon('GET', `/api/properties?q=Searchford&checkIn=${dateIn(210)}&checkOut=${dateIn(212)}`);
+  assert.strictEqual(r.data.properties.length, 1);
+
+  // Arriving the day the previous guest leaves is allowed.
+  r = await anon('GET', `/api/properties?q=Searchford&checkIn=${dateIn(203)}&checkOut=${dateIn(205)}`);
+  assert.strictEqual(r.data.properties.length, 1, 'same-day changeover stays available');
+});
+
+test('a dated search quotes the whole stay, not just the nightly rate', async () => {
+  const owner = await makeOwner('quote-owner@example.com');
+  await makeProperty(owner, { title: 'Quote Lodge', location: 'Quoteton', pricePerNight: 2000 });
+
+  const anon = client();
+  const r = await anon('GET', `/api/properties?q=Quoteton&checkIn=${dateIn(220)}&checkOut=${dateIn(224)}`);
+  assert.strictEqual(r.data.nights, 4);
+  const found = r.data.properties[0];
+  assert.strictEqual(found.nights, 4);
+  assert.strictEqual(found.stayTotal, 8000);
+});
+
+test('search rejects half-open and invalid date ranges', async () => {
+  const anon = client();
+  for (const query of [
+    `checkIn=${dateIn(5)}`,
+    `checkOut=${dateIn(5)}`,
+    `checkIn=${dateIn(9)}&checkOut=${dateIn(7)}`,
+    `checkIn=${dateIn(5)}&checkOut=${dateIn(5)}`,
+    `checkIn=2026-02-31&checkOut=${dateIn(9)}`,
+    `checkIn=${dateIn(-4)}&checkOut=${dateIn(2)}`,
+    `checkIn=not-a-date&checkOut=${dateIn(9)}`,
+  ]) {
+    const r = await anon('GET', `/api/properties?${query}`);
+    assert.strictEqual(r.status, 400, query);
+  }
+});
+
+test('an undated search still returns everything with no stay quote', async () => {
+  const anon = client();
+  const r = await anon('GET', '/api/properties');
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.nights, null);
+  assert.ok(r.data.properties.every((p) => p.stayTotal === undefined));
+});
+
 // --- Registration and portal separation ---
 
 test('registration rejects a self-assigned admin role', async () => {

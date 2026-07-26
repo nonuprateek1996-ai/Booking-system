@@ -83,29 +83,48 @@ a { color: var(--brand); }
   display: flex;
   gap: 0.5rem;
   justify-content: center;
+  align-items: flex-end;
   flex-wrap: wrap;
-  max-width: 46rem;
+  max-width: 60rem;
   margin: 0 auto;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 0.6rem;
+  border-radius: 14px;
+}
+
+.search-field { margin: 0; flex: 1 1 9rem; text-align: left; }
+.search-field.narrow { flex: 0 1 7.5rem; }
+
+.search-field span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 0.15rem;
 }
 
 .search input {
-  flex: 1 1 10rem;
-  min-width: 8rem;
-  padding: 0.7rem 0.9rem;
+  width: 100%;
+  margin-top: 0;
+  padding: 0.6rem 0.75rem;
   border: none;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 0.97rem;
 }
 
 .search button {
-  padding: 0.7rem 1.5rem;
+  padding: 0.6rem 1.6rem;
   border: none;
   border-radius: 8px;
   background: #072d25;
   color: #fff;
   font-size: 1rem;
   cursor: pointer;
+  height: 2.6rem;
 }
+
+.card-total { margin: 0.3rem 0 0; font-size: 0.9rem; color: var(--brand); font-weight: 600; }
 
 .search button:hover { background: #05201a; }
 
