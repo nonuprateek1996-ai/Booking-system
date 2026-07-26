@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 1080" width="1360" height="1080" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>Staylist architecture</title>
+  <desc>Request flow from browsers through the Express middleware chain and route modules into SQLite, plus notification transports and owner provisioning.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c8d78"/>
+    </marker>
+    <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b07b2a"/>
+    </marker>
+    <style>
+      .lane      { fill: #ffffff; stroke: #dfe5dc; stroke-width: 1.5; rx: 14; }
+      .lane-tint { fill: #f3f7f1; stroke: #dfe5dc; stroke-width: 1.5; rx: 14; }
+      .box       { fill: #ffffff; stroke: #c8d4c5; stroke-width: 1.5; rx: 10; }
+      .box-ink   { fill: #1f2a1d; rx: 10; }
+      .box-sec   { fill: #fdf6e9; stroke: #e6cfa4; stroke-width: 1.5; rx: 10; }
+      .box-db    { fill: #eef4ec; stroke: #b9cdb6; stroke-width: 1.5; rx: 10; }
+      .lane-label{ font-size: 12px; font-weight: 700; fill: #6b7a67; letter-spacing: 1.4px; }
+      .h         { font-size: 15px; font-weight: 600; fill: #1f2a1d; }
+      .h-light   { font-size: 15px; font-weight: 600; fill: #ffffff; }
+      .t         { font-size: 12.5px; fill: #4b5b47; }
+      .t-light   { font-size: 12.5px; fill: rgba(255,255,255,0.82); }
+      .mono      { font-size: 11.5px; fill: #6b7a67; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .edge      { stroke: #7c8d78; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .edge-dash { stroke: #b07b2a; stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrow-accent); }
+      .edge-note { font-size: 11px; fill: #6b7a67; }
+    </style>
+  </defs>
+
+  <rect width="1360" height="1080" fill="#f6f8f4"/>
+
+  <text x="40" y="52" font-size="26" font-weight="600" fill="#1f2a1d" letter-spacing="-0.5">Staylist — guesthouse booking system</text>
+  <text x="40" y="76" class="t">Node.js · Express · better-sqlite3 · vanilla ES modules. One guesthouse, individually bookable rooms.</text>
+
+  <!-- ============ CLIENTS ============ -->
+  <rect class="lane" x="40" y="104" width="1280" height="132"/>
+  <text x="60" y="130" class="lane-label">BROWSER · no build step, ES modules, all DOM via textContent</text>
+
+  <rect class="box" x="60" y="144" width="290" height="76"/>
+  <text x="76" y="168" class="h">Public — anyone</text>
+  <text x="76" y="188" class="t">index.html · room.html</text>
+  <text x="76" y="206" class="mono">home.js · room.js</text>
+
+  <rect class="box" x="368" y="144" width="290" height="76"/>
+  <text x="384" y="168" class="h">Guest — signed in</text>
+  <text x="384" y="188" class="t">login.html · bookings.html</text>
+  <text x="384" y="206" class="mono">login.js · bookings.js</text>
+
+  <rect class="box-sec" x="676" y="144" width="290" height="76"/>
+  <text x="692" y="168" class="h">Owner — hardened portal</text>
+  <text x="692" y="188" class="t">owner-login.html · owner.html</text>
+  <text x="692" y="206" class="mono">owner.js (4 tabs)</text>
+
+  <rect class="box" x="984" y="144" width="316" height="76"/>
+  <text x="1000" y="168" class="h">Static assets</text>
+  <text x="1000" y="188" class="t">hero.jpg · styles.css · favicon</text>
+  <text x="1000" y="206" class="mono">fonts/inter-*.woff2 (self-hosted)</text>
+
+  <!-- clients -> middleware -->
+  <path class="edge" d="M 205 220 L 205 268"/>
+  <path class="edge" d="M 513 220 L 513 268"/>
+  <path class="edge" d="M 821 220 L 821 268"/>
+  <text x="530" y="252" class="edge-note">HTTPS · same-origin fetch, session cookie</text>
+
+  <!-- ============ MIDDLEWARE ============ -->
+  <rect class="lane-tint" x="40" y="276" width="1280" height="118"/>
+  <text x="60" y="302" class="lane-label">EXPRESS MIDDLEWARE CHAIN — src/app.js (in order)</text>
+
+  <rect class="box" x="60" y="316" width="176" height="62"/>
+  <text x="76" y="340" class="h">/healthz</text>
+  <text x="76" y="360" class="t">above the limiter</text>
+
+  <rect class="box" x="248" y="316" width="176" height="62"/>
+  <text x="264" y="340" class="h">Helmet CSP</text>
+  <text x="264" y="360" class="t">default-src 'self'</text>
+
+  <rect class="box" x="436" y="316" width="176" height="62"/>
+  <text x="452" y="340" class="h">Rate limit</text>
+  <text x="452" y="360" class="t">global · auth · owner</text>
+
+  <rect class="box" x="624" y="316" width="176" height="62"/>
+  <text x="640" y="340" class="h">json 10 KB</text>
+  <text x="640" y="360" class="t">raw image 2 MB</text>
+
+  <rect class="box" x="812" y="316" width="176" height="62"/>
+  <text x="828" y="340" class="h">sessionLoader</text>
+  <text x="828" y="360" class="t">idle + absolute TTL</text>
+
+  <rect class="box" x="1000" y="316" width="300" height="62"/>
+  <text x="1016" y="340" class="h">csrfProtection</text>
+  <text x="1016" y="360" class="t">SameSite=Strict + Origin check</text>
+
+  <path class="edge" d="M 680 378 L 680 424"/>
+
+  <!-- ============ ROUTES ============ -->
+  <rect class="lane" x="40" y="432" width="1280" height="212"/>
+  <text x="60" y="458" class="lane-label">ROUTES — role-gated at every entry point</text>
+
+  <rect class="box" x="60" y="472" width="396" height="152"/>
+  <text x="76" y="496" class="h">routes/auth.js</text>
+  <text x="76" y="518" class="t">register (guest only, never owner)</text>
+  <text x="76" y="538" class="t">login — portal-scoped, lockout, 2FA</text>
+  <text x="76" y="558" class="t">2fa/setup · enable · disable · codes</text>
+  <text x="76" y="578" class="t">security — sessions + sign-in audit</text>
+  <text x="76" y="602" class="mono">public · requireAuth · requireOwner</text>
+
+  <rect class="box" x="482" y="472" width="396" height="152"/>
+  <text x="498" y="496" class="h">routes/rooms.js</text>
+  <text x="498" y="518" class="t">GET property · rooms · images  (public)</text>
+  <text x="498" y="538" class="t">availability filter by check-in/out</text>
+  <text x="498" y="558" class="t">owner: room CRUD, publish, photos</text>
+  <text x="498" y="578" class="t">uploads sniffed by magic bytes</text>
+  <text x="498" y="602" class="mono">public · requireOwner</text>
+
+  <rect class="box" x="904" y="472" width="396" height="152"/>
+  <text x="920" y="496" class="h">routes/bookings.js</text>
+  <text x="920" y="518" class="t">guest: request · list · cancel</text>
+  <text x="920" y="538" class="t">owner: inbox · approve · decline</text>
+  <text x="920" y="558" class="t">overlap check + insert in one</text>
+  <text x="920" y="578" class="t">immediate transaction</text>
+  <text x="920" y="602" class="mono">requireGuest · requireOwner</text>
+
+  <!-- routes -> services -->
+  <path class="edge" d="M 258 624 L 258 686"/>
+  <path class="edge" d="M 680 624 L 680 686"/>
+  <path class="edge-dash" d="M 1102 624 L 1102 686"/>
+
+  <!-- ============ SERVICES ============ -->
+  <rect class="lane" x="40" y="694" width="1280" height="150"/>
+  <text x="60" y="720" class="lane-label">DOMAIN MODULES — src/</text>
+
+  <rect class="box-sec" x="60" y="734" width="290" height="94"/>
+  <text x="76" y="758" class="h">auth.js · totp.js</text>
+  <text x="76" y="778" class="t">tokens stored as SHA-256 only</text>
+  <text x="76" y="796" class="t">TOTP on node:crypto, replay-proof</text>
+  <text x="76" y="814" class="t">lockout · audit · session revoke</text>
+
+  <rect class="box" x="368" y="734" width="290" height="94"/>
+  <text x="384" y="758" class="h">validators.js</text>
+  <text x="384" y="778" class="t">allow-list validation of every field</text>
+  <text x="384" y="796" class="t">real calendar dates, stay windows</text>
+  <text x="384" y="814" class="t">image magic-byte sniffing (no SVG)</text>
+
+  <rect class="box" x="676" y="734" width="290" height="94"/>
+  <text x="692" y="758" class="h">db.js</text>
+  <text x="692" y="778" class="t">better-sqlite3, WAL, foreign keys</text>
+  <text x="692" y="796" class="t">schema v3 + demo seeding</text>
+  <text x="692" y="814" class="t">prepared statements everywhere</text>
+
+  <rect class="box" x="984" y="734" width="316" height="94"/>
+  <text x="1000" y="758" class="h">notify.js</text>
+  <text x="1000" y="778" class="t">records every message before send</text>
+  <text x="1000" y="796" class="t">delivery is fire-and-forget</text>
+  <text x="1000" y="814" class="t">never blocks or fails a booking</text>
+
+  <path class="edge" d="M 205 828 L 205 890"/>
+  <path class="edge" d="M 821 828 L 821 890"/>
+  <path class="edge-dash" d="M 1142 828 L 1142 890"/>
+
+  <!-- ============ STORAGE + EXTERNAL ============ -->
+  <rect class="lane" x="40" y="898" width="1020" height="146"/>
+  <text x="60" y="924" class="lane-label">SQLITE — data/booking.db (one file)</text>
+
+  <rect class="box-db" x="60" y="938" width="228" height="42"/>
+  <text x="76" y="964" class="h">users · sessions</text>
+  <rect class="box-db" x="300" y="938" width="228" height="42"/>
+  <text x="316" y="964" class="h">recovery_codes</text>
+  <rect class="box-db" x="540" y="938" width="228" height="42"/>
+  <text x="556" y="964" class="h">login_audit</text>
+  <rect class="box-db" x="780" y="938" width="260" height="42"/>
+  <text x="796" y="964" class="h">property · rooms</text>
+
+  <rect class="box-db" x="60" y="990" width="228" height="42"/>
+  <text x="76" y="1016" class="h">images (BLOB)</text>
+  <rect class="box-db" x="300" y="990" width="228" height="42"/>
+  <text x="316" y="1016" class="h">bookings</text>
+  <rect class="box-db" x="540" y="990" width="228" height="42"/>
+  <text x="556" y="1016" class="h">notifications</text>
+  <text x="796" y="1010" class="t">pending + approved bookings</text>
+  <text x="796" y="1028" class="t">hold their dates</text>
+
+  <rect class="lane-tint" x="1080" y="898" width="240" height="146"/>
+  <text x="1100" y="924" class="lane-label">EXTERNAL</text>
+  <rect class="box-sec" x="1100" y="938" width="200" height="44"/>
+  <text x="1116" y="957" class="h">SMTP</text>
+  <text x="1116" y="974" class="t">nodemailer · optional</text>
+  <rect class="box-sec" x="1100" y="992" width="200" height="44"/>
+  <text x="1116" y="1011" class="h">WhatsApp Cloud API</text>
+  <text x="1116" y="1028" class="t">template · optional</text>
+
+  <!-- ============ STARTUP NOTE ============ -->
+  <text x="60" y="1066" class="edge-note">Startup: server.js → owner-bootstrap.js provisions the single owner from OWNER_EMAIL / OWNER_PASSWORD, never overwriting an existing account — the only way an owner exists, alongside npm run create-owner.</text>
+</svg>

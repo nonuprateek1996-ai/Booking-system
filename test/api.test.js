@@ -929,26 +929,28 @@ test('the health check endpoint answers and is not rate limited', async () => {
   assert.strictEqual(results[0].headers.get('ratelimit-limit'), null, 'not counted by the limiter');
 });
 
-test('the hero artwork is reported only when a file is actually present', async () => {
+test('the hero artwork is detected from disk, in candidate order', async () => {
   const fsp = require('fs');
   const pth = require('path');
-  const target = pth.join(__dirname, '..', 'public', 'hero.png');
+  // hero.webp is first in the candidate list, so it wins whatever else the
+  // repository happens to ship — the test does not assume an empty /public.
+  const target = pth.join(__dirname, '..', 'public', 'hero.webp');
   const anon = client();
 
-  const before = await anon('GET', '/api/property');
-  assert.strictEqual(before.data.heroImage, null, 'nothing reported when no artwork is bundled');
+  const baseline = (await anon('GET', '/api/property')).data.heroImage;
+  assert.ok(baseline === null || baseline.startsWith('/hero.'), 'reports a hero path or nothing');
+  assert.ok(!fsp.existsSync(target), 'test file is not already present');
 
-  // A one-pixel PNG stands in for the artwork.
   fsp.writeFileSync(target, PNG_1X1);
   try {
     const during = await anon('GET', '/api/property');
-    assert.strictEqual(during.data.heroImage, '/hero.png');
-    const served = await fetch(`${baseUrl}/hero.png`);
-    assert.strictEqual(served.status, 200);
+    assert.strictEqual(during.data.heroImage, '/hero.webp', 'the first candidate takes precedence');
+    const served = await fetch(`${baseUrl}/hero.webp`);
+    assert.strictEqual(served.status, 200, 'and is actually served');
   } finally {
     fsp.rmSync(target, { force: true });
   }
 
-  const after = await anon('GET', '/api/property');
-  assert.strictEqual(after.data.heroImage, null, 'reported again as absent once removed');
+  const after = (await anon('GET', '/api/property')).data.heroImage;
+  assert.strictEqual(after, baseline, 'falls back to the previous state once removed');
 });

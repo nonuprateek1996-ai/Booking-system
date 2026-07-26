@@ -8,6 +8,14 @@ An Airbnb-style booking site for a **single guesthouse with individually bookabl
 - **Frontend:** Vanilla HTML/CSS/ES modules, served statically
 - **Auth:** Server-side sessions (hashed tokens, HttpOnly cookies) with TOTP two-factor for the owner
 
+## Architecture
+
+![Architecture of the Staylist booking system](docs/architecture.svg)
+
+Requests flow top to bottom: the browser talks to one Express app, every request passes the same middleware chain (CSP → rate limit → body caps → session → CSRF) before any route sees it, routes are role-gated at the entry point, and all persistence is a single SQLite file. Notification delivery hangs off to the side deliberately — it is fire-and-forget, so a slow or unconfigured provider can never delay or fail a booking.
+
+The diagram is an SVG (`docs/architecture.svg`), so it is diffable and editable rather than a screenshot.
+
 ## Getting started
 
 ```bash
