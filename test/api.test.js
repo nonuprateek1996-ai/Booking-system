@@ -174,8 +174,8 @@ test('the property and rooms are readable with no account', async () => {
 test('owner contact details are visible to anonymous visitors', async () => {
   const owner = await ownerClient();
   await owner('PATCH', '/api/owner/property', {
-    name: 'Lakeview Homestay',
-    location: 'Nainital',
+    name: "Colonel's Paradise Homestay",
+    location: 'Bir, Himachal',
     contactName: 'Priya Sharma',
     contactEmail: 'priya@example.com',
     contactPhone: '+91 98765 43210',

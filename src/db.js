@@ -197,20 +197,20 @@ if (process.env.SEED_DEMO !== '0') {
            contact_name = ?, contact_email = ?, contact_phone = ?
          WHERE id = 1`
       ).run(
-        'Lakeview Homestay',
-        'Four rooms above the water, ten minutes from town',
-        'A family-run homestay on the quiet side of the lake. Breakfast is served on the veranda, ' +
-          'the garden runs down to the water, and the town market is a ten-minute walk away.',
-        'Nainital, Uttarakhand',
+        "Colonel's Paradise Homestay",
+        'Four rooms with mountain views, ten minutes from the village',
+        'A family-run homestay on the quiet edge of the village. Breakfast is served on the veranda, ' +
+          'the garden looks out across the valley, and the market is a ten-minute walk away.',
+        'Bir, Himachal',
         'Priya Sharma',
-        'stay@lakeviewhomestay.example',
+        'stay@colonelsparadise.example',
         '+91 90000 00000'
       );
 
       const insertRoom = db.prepare(
         'INSERT INTO rooms (name, description, price_per_night, max_guests) VALUES (?, ?, ?, ?)'
       );
-      insertRoom.run('Lake-facing Room', 'King bed, private balcony over the water, en-suite bathroom.', 4200, 2);
+      insertRoom.run('Valley-facing Room', 'King bed, private balcony over the valley, en-suite bathroom.', 4200, 2);
       insertRoom.run('Garden Room', 'Queen bed opening onto the garden, walk-in shower.', 3400, 2);
       insertRoom.run('Family Room', 'One double and two singles, ideal for families with children.', 5600, 4);
       insertRoom.run('Attic Single', 'Compact single room under the eaves with a reading nook.', 1900, 1);
