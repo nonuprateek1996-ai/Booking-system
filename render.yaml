@@ -5,7 +5,10 @@ services:
     plan: free
     buildCommand: npm ci
     startCommand: npm start
-    healthCheckPath: /api/rooms
+    # A dedicated endpoint, so renaming a product route can never break the
+    # deploy gate. If this service was created with an older blueprint, update
+    # Settings -> Health Check Path by hand: Render does not always re-sync it.
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
         value: 22.22.2

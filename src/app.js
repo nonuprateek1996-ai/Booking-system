@@ -5,6 +5,7 @@ const express = require('express');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
+const db = require('./db');
 const { sessionLoader, csrfProtection, pruneExpiredSessions } = require('./auth');
 const authRoutes = require('./routes/auth');
 const roomRoutes = require('./routes/rooms');
@@ -39,6 +40,21 @@ app.use(
     referrerPolicy: { policy: 'no-referrer' },
   })
 );
+
+// Health check for the hosting platform. Deliberately a dedicated endpoint
+// rather than a product one: it must keep answering across refactors, and it
+// sits above the rate limiter so frequent polling can never be throttled or
+// eat into a real visitor's allowance.
+app.get('/healthz', (req, res) => {
+  try {
+    // Confirms the process is up *and* the database is readable.
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Health check failed:', err.message);
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
 
 // Global rate limit; credential endpoints have their own tighter limit.
 app.use(

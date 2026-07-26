@@ -916,3 +916,15 @@ test('unknown API routes return JSON 404s', async () => {
   assert.strictEqual(r.status, 404);
   assert.strictEqual(r.data.error, 'Not found');
 });
+
+test('the health check endpoint answers and is not rate limited', async () => {
+  // Far more requests than the configured limiter would allow a normal route,
+  // because the platform polls this constantly.
+  const results = await Promise.all(
+    Array.from({ length: 40 }, () => fetch(`${baseUrl}/healthz`))
+  );
+  assert.ok(results.every((r) => r.status === 200), 'every probe succeeds');
+  const body = await results[0].json();
+  assert.strictEqual(body.status, 'ok');
+  assert.strictEqual(results[0].headers.get('ratelimit-limit'), null, 'not counted by the limiter');
+});
