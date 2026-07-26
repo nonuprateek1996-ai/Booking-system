@@ -18,20 +18,34 @@
 
     <div class="card">
       <p class="portal-tag owner">Owner account</p>
-      <h1 id="auth-title">Sign in to manage your properties</h1>
+      <h1 id="auth-title">Owner sign in</h1>
 
       <form id="auth-form">
-        <label id="name-row" hidden>Name<input type="text" id="name" maxlength="100" autocomplete="name"></label>
-        <label>Email<input type="email" id="email" required maxlength="254" autocomplete="email"></label>
-        <label>Password<input type="password" id="password" required minlength="8" maxlength="72" autocomplete="current-password"></label>
+        <label>Email<input type="email" id="email" required maxlength="254" autocomplete="username"></label>
+        <label>Password<input type="password" id="password" required maxlength="72" autocomplete="current-password"></label>
+
+        <div id="totp-row" hidden>
+          <label>Authenticator code
+            <input type="text" id="totpCode" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="6" pattern="[0-9]{6}" placeholder="123456">
+          </label>
+          <p class="hint">
+            Lost your phone?
+            <button type="button" id="use-recovery" class="link-btn">Use a recovery code</button>
+          </p>
+          <label id="recovery-row" hidden>Recovery code
+            <input type="text" id="recoveryCode" maxlength="14" placeholder="XXXX-XXXX-XXXX">
+          </label>
+        </div>
+
         <button type="submit" id="submit">Sign in</button>
       </form>
 
-      <p class="switch">
-        <span id="toggle-text">Want to list a property?</span>
-        <button type="button" id="toggle" class="link-btn">Create an owner account</button>
+      <p class="switch hint">
+        There is one owner account and it is created on the server, so there is no sign-up here.
+        Run <code>npm run create-owner</code> to create or reset it.
       </p>
-      <p class="switch hint">Looking to book a stay? <a href="/login.html">Use the guest portal</a>.</p>
+      <p class="switch hint">Looking to book a room? <a href="/login.html">Guest sign in</a>.</p>
     </div>
   </main>
 

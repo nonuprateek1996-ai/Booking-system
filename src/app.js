@@ -7,7 +7,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { sessionLoader, csrfProtection, pruneExpiredSessions } = require('./auth');
 const authRoutes = require('./routes/auth');
-const propertyRoutes = require('./routes/properties');
+const roomRoutes = require('./routes/rooms');
 const bookingRoutes = require('./routes/bookings');
 
 const app = express();
@@ -58,7 +58,7 @@ app.use(sessionLoader);
 app.use(csrfProtection);
 
 app.use('/api/auth', authRoutes);
-app.use('/api', propertyRoutes);
+app.use('/api', roomRoutes);
 app.use('/api', bookingRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));

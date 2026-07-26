@@ -3,24 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Staylist — find a place to stay</title>
+  <title>Staylist — book a room</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="/">Staylist</a>
+    <a class="brand" href="/"><span id="brand-name">Staylist</span></a>
     <nav id="nav"></nav>
   </header>
 
   <section class="hero">
-    <h1>Find a place to stay</h1>
-    <p>Browse homes, cottages and villas. No account needed to look around.</p>
+    <h1 id="property-name">Loading…</h1>
+    <p id="property-tagline"></p>
+    <p id="property-location" class="hero-location"></p>
     <form id="search-form" class="search">
-      <label class="search-field">
-        <span>Where</span>
-        <input type="search" id="q" placeholder="Anywhere" maxlength="100">
-      </label>
       <label class="search-field">
         <span>Check in</span>
         <input type="date" id="checkIn">
@@ -33,23 +30,42 @@
         <span>Guests</span>
         <input type="number" id="guests" placeholder="Any" min="1" max="50">
       </label>
-      <label class="search-field narrow">
-        <span>Max ₹/night</span>
-        <input type="number" id="maxPrice" placeholder="Any" min="1" step="500">
-      </label>
-      <button type="submit">Search</button>
+      <button type="submit">Check availability</button>
     </form>
   </section>
 
   <main>
     <p id="message" role="alert" hidden></p>
+
+    <div id="gallery" class="gallery"></div>
+
+    <section class="about-columns">
+      <div>
+        <h2>About the place</h2>
+        <p id="property-about" class="detail-description"></p>
+        <div id="house-rules-block" hidden>
+          <h2>House rules</h2>
+          <p id="house-rules" class="detail-description"></p>
+        </div>
+      </div>
+      <aside class="card contact-card">
+        <h2>Contact the owner</h2>
+        <p id="contact-name"></p>
+        <p id="contact-phone"></p>
+        <p id="contact-email"></p>
+        <p id="contact-address" class="hint"></p>
+        <p id="check-times" class="hint"></p>
+      </aside>
+    </section>
+
+    <h2 id="rooms-heading">Rooms</h2>
     <div id="results-count" class="results-count"></div>
     <div id="grid" class="grid"></div>
-    <p id="empty" class="empty" hidden>No properties match your search yet.</p>
+    <p id="empty" class="empty" hidden>No rooms are free for those dates. Try different nights.</p>
   </main>
 
   <footer class="site-footer">
-    <p>Own a place? <a href="/owner-login.html">List it on Staylist</a>.</p>
+    <p>Owner? <a href="/owner-login.html">Sign in to manage rooms and booking requests</a>.</p>
   </footer>
 
   <script type="module" src="/js/home.js"></script>

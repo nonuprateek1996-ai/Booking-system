@@ -1,12 +1,12 @@
-# Staylist — property booking system
+# Staylist — guesthouse booking site
 
-A secure property-rental web application. Visitors browse listings, photos and prices with no account at all; guests sign in to book stays; owners sign in through a separate portal to list and manage their properties.
+An Airbnb-style booking site for a **single guesthouse with individually bookable rooms**. Visitors browse the place, its rooms, photos, prices and the owner's contact details with no account at all. Guests sign in to request a room for a date range. The owner signs in through a separate, hardened portal to manage rooms and approve requests.
 
 ## Stack
 
 - **Backend:** Node.js (≥18), Express, better-sqlite3 (SQLite)
 - **Frontend:** Vanilla HTML/CSS/ES modules, served statically
-- **Auth:** Server-side sessions with hashed tokens in HttpOnly cookies
+- **Auth:** Server-side sessions (hashed tokens, HttpOnly cookies) with TOTP two-factor for the owner
 
 ## Getting started
 
@@ -15,91 +15,136 @@ npm install
 npm start          # serves http://127.0.0.1:3000
 ```
 
-The SQLite database is created automatically in `data/`, and a few example listings are seeded on first run so the landing page isn't empty. Set `SEED_DEMO=0` to skip that. The seeded demo owner is given a random, unrecorded password, so it is not a usable account — real owners register their own.
+The database is created in `data/` and seeded with an example guesthouse and four rooms so the site isn't empty. Set `SEED_DEMO=0` to skip that. **Seed data ships no usable credentials.**
 
-Run the test suite (33 tests, including security regression tests):
+Create the owner account — this is the only way one comes into existence:
+
+```bash
+OWNER_EMAIL=you@example.com OWNER_PASSWORD='a-strong-password-12+' npm run create-owner
+```
+
+Then sign in at `/owner-login.html` and turn on two-factor authentication under **Security**. Re-running the command rotates the password and signs out every device, which doubles as the password-reset path.
+
+Run the test suite (47 tests, mostly security regression tests):
 
 ```bash
 npm test
 ```
 
-Optional: create an admin account (credentials come from the environment, never from code). Admins sign in through the owner portal and can manage every listing.
-
-```bash
-ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='a-strong-password' npm run create-admin
-```
-
 ## How it works
 
-**Visitors (no account)** land on the property grid, search by place, price and party size, and open any listing to see its photos, description, rooms and the owner's contact details.
+**Visitors (no account)** land on the guesthouse page: gallery, description, house rules, owner contact details, and the room list. They search *check-in → check-out → guests*, and rooms already taken for those nights disappear from the results; the rest are quoted for the whole stay.
 
-**Guests** register at `/login.html`, pick dates and party size on a listing, and get instant confirmation if the dates are free. `/bookings.html` lists their trips with the host's contact details and a cancel button.
+**Guests** register at `/login.html`, pick a room and dates, and submit a request with an optional message. `/bookings.html` shows each request's status — awaiting approval, confirmed, or declined — and reveals the address and arrival times once confirmed.
 
-**Owners** register at `/owner-login.html` and manage everything from `/owner.html`: create properties, edit title, location, description, nightly price and capacity, add and remove room descriptions, upload and delete photos, publish or unpublish a listing, and see every booking on their properties with the guest's contact details.
+**The owner** manages everything from `/owner.html`, in four tabs:
+- **Requests** — approve or decline each booking with a note to the guest
+- **Rooms** — add, edit, publish/unpublish and delete rooms; set price, capacity, description; upload and delete photos
+- **The place** — name, tagline, about, location, address, contact details, check-in/out times, house rules, and the gallery
+- **Security** — two-factor setup, recovery codes, password change, signed-in devices, and recent sign-in activity
 
-Guests book whole properties by the night. Rooms are descriptive detail within a listing, not separately bookable.
+Rooms are unique units: once a room is held for a night, nobody else can take it. A **pending request holds its dates**, so the owner is never asked to approve two guests for the same room and nights; declining releases them again.
+
+## Booking notifications
+
+When a request arrives, the owner is alerted by **email and WhatsApp**. Every message is recorded in the database *before* delivery is attempted, so a request is never lost if a provider is down or unconfigured — the dashboard is always the source of truth. Delivery is fire-and-forget and can never delay or fail a guest's booking.
+
+Transports activate purely from environment variables:
+
+| Channel | Variables |
+|---|---|
+| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
+| WhatsApp | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus `WHATSAPP_TEMPLATE_NAME` |
+| Override recipients | `NOTIFY_EMAIL`, `NOTIFY_PHONE` (default to the property's contact details) |
+
+A booking alert is business-initiated, so Meta requires an **approved message template** to reach you outside a 24-hour reply window — set `WHATSAPP_TEMPLATE_NAME` to a Utility template whose body has five placeholders, in this order: guest name, room, check-in, check-out, total. Without a template the code falls back to plain text, which only lands inside that window. The guest is emailed when their request is approved or declined.
 
 ## API
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/api/properties` | public | Search and list published properties |
-| GET | `/api/properties/:id` | public | Listing detail, rooms, photos, booked dates |
-| GET | `/api/images/:id` | public | Serve a property photo |
-| POST | `/api/auth/register` | public | Create a guest or owner account |
-| POST | `/api/auth/login` | public | Sign in through the `guest` or `owner` portal |
+| GET | `/api/property` | public | The guesthouse and its gallery |
+| GET | `/api/rooms` | public | Rooms, filterable by `checkIn`/`checkOut`/`guests` |
+| GET | `/api/rooms/:id` | public | Room detail, photos, held dates |
+| GET | `/api/images/:id` | public | Serve a photo |
+| POST | `/api/auth/register` | public | Create a **guest** account (never an owner) |
+| POST | `/api/auth/login` | public | Sign in via the `guest` or `owner` portal |
 | POST | `/api/auth/logout` | any | Sign out |
 | GET | `/api/auth/me` | public | Current user, or `null` |
-| POST | `/api/auth/change-password` | any | Change password, revokes other sessions |
-| POST | `/api/bookings` | guest | Book a stay |
-| GET | `/api/bookings` | guest | Own bookings |
-| DELETE | `/api/bookings/:id` | guest | Cancel own booking |
-| GET | `/api/owner/properties` | owner | Own listings, with rooms and photos |
-| POST | `/api/owner/properties` | owner | Create a listing |
-| PATCH | `/api/owner/properties/:id` | owner | Update or (un)publish a listing |
-| DELETE | `/api/owner/properties/:id` | owner | Delete a listing |
-| POST | `/api/owner/properties/:id/rooms` | owner | Add a room description |
-| DELETE | `/api/owner/rooms/:id` | owner | Remove a room |
-| POST | `/api/owner/properties/:id/images` | owner | Upload a photo (raw JPEG/PNG/WebP body) |
+| POST | `/api/auth/change-password` | any | Change password, revokes all sessions |
+| POST | `/api/auth/2fa/setup` · `/enable` · `/disable` | owner | Two-factor enrolment and removal |
+| POST | `/api/auth/2fa/recovery-codes` | owner | Regenerate recovery codes |
+| GET | `/api/auth/security` | owner | 2FA state, sessions, sign-in audit |
+| DELETE | `/api/auth/sessions/:id` | owner | Revoke one device |
+| POST | `/api/auth/sessions/revoke-others` | owner | Sign out everywhere else |
+| POST | `/api/bookings` | guest | Request a room |
+| GET | `/api/bookings` | guest | Own requests and stays |
+| DELETE | `/api/bookings/:id` | guest | Withdraw or cancel own booking |
+| GET | `/api/owner/bookings` | owner | Approval inbox, filterable by status |
+| POST | `/api/owner/bookings/:id/approve` · `/decline` | owner | Decide a request |
+| PATCH | `/api/owner/property` | owner | Edit the guesthouse |
+| GET/POST | `/api/owner/rooms` | owner | List / create rooms |
+| PATCH/DELETE | `/api/owner/rooms/:id` | owner | Edit / delete a room |
+| POST | `/api/owner/rooms/:id/images` | owner | Upload a room photo (raw image body) |
+| POST | `/api/owner/property/images` | owner | Upload a gallery photo |
 | DELETE | `/api/owner/images/:id` | owner | Delete a photo |
-| GET | `/api/owner/bookings` | owner | Bookings across own properties |
+| GET | `/api/owner/notifications` | owner | Notification history and transport status |
 
 Stays may start up to 365 days ahead and run up to 60 nights.
 
 ## Security design
 
-The application was built to eliminate the common web vulnerability classes, and each of these is covered by a regression test:
+Every item below is covered by a regression test.
 
-- **SQL injection** — every query uses prepared statements with bound parameters; no string-built SQL anywhere. Search terms additionally escape LIKE wildcards, so a bare `%` is matched literally rather than returning every listing.
-- **XSS** — the frontend builds all DOM through `textContent`/`createTextNode` and never uses `innerHTML`, so listing text written by owners cannot become markup. A strict Content-Security-Policy (`default-src 'self'`, no inline scripts) enforces this a second time.
-- **Malicious uploads** — photos are accepted only after their real type is confirmed by magic-byte sniffing, never from the declared `Content-Type`. SVG is deliberately unsupported because it can carry script. Uploads are capped at 2 MB and 20 photos per property, and are served with a fixed type plus `nosniff`.
-- **Broken access control** — roles are `guest`, `owner` and `admin`, and each route lists exactly which may reach it. Guests cannot reach owner endpoints and owners cannot book. `admin` can never be self-assigned at registration; it is granted only by the server-side `create-admin` script.
-- **Portal isolation** — guest and owner sign-in are separate portals, and an account can only authenticate through its own. Using the wrong portal returns the same error as a wrong password, so the portals cannot be used to discover which emails are owners.
-- **IDOR** — every owner mutation resolves the target through an ownership check, and bookings are scoped to the signed-in guest in the `WHERE` clause. Another user's property, room, photo or booking returns 404 rather than 403, so its existence is never confirmed.
-- **CSRF** — session cookies are `SameSite=Strict`, and every state-changing request is additionally checked against the request `Origin`/`Referer`.
-- **Broken authentication** — passwords hashed with bcrypt (cost 12, 8–72 character policy); login compares against a dummy hash when the account doesn't exist, so timing and error messages don't reveal which emails are registered.
-- **Session hijacking** — session tokens are 256-bit random values stored server-side only as SHA-256 hashes (a database leak exposes no usable tokens); cookies are `HttpOnly`, `SameSite=Strict`, and `Secure` in production; sessions expire after 7 days; a password change revokes all sessions.
-- **Price tampering** — booking totals are computed server-side from the stored nightly rate, and a price sent by the client is ignored. Money is held as integers, so totals cannot drift through floating-point rounding.
-- **Double booking** — the availability check and the insert run inside one immediate transaction, so simultaneous requests for overlapping dates cannot both succeed. Same-day changeover is allowed by design.
-- **Open redirect** — the post-login `?next=` parameter is honoured only for same-origin relative paths.
-- **Data loss** — deleting a property with upcoming bookings is refused; owners unpublish instead, which hides the listing without destroying stays guests are relying on.
-- **Brute force / DoS** — rate limiting on all endpoints with a tighter limit on credential endpoints; JSON bodies capped at 10 KB.
-- **Information leakage** — a central error handler returns generic messages and logs details server-side only; `X-Powered-By` is disabled; security headers (CSP, `nosniff`, `frame-ancestors 'none'`, referrer policy) are set by Helmet.
-- **Secrets** — no credentials in the codebase; admin credentials come from environment variables; seeded demo data ships no usable password; the database and `.env` are git-ignored.
+### The owner account
 
-For production, run behind TLS (the `Secure` cookie flag activates with `NODE_ENV=production`) and set `TRUST_PROXY=1` when behind a single reverse proxy so secure cookies and per-client rate limiting work correctly. The server binds to `127.0.0.1` by default; set `HOST`/`PORT` as needed.
+The owner account controls the whole guesthouse, so it is hardened well past the guest accounts:
 
-## Deploying (go live)
+- **No self-registration.** Registration always produces a guest, whatever the request body claims. The owner exists only via `npm run create-owner`, so no network path can mint one.
+- **Two-factor authentication (TOTP)** compatible with any authenticator app, implemented on Node's own crypto — it adds no third-party dependency to the supply chain. Codes are compared in constant time, accepted within one 30-second step either side for clock drift, and **cannot be replayed**: the consumed step is recorded, so a code observed over the shoulder or in a log is dead inside its own window.
+- **Single-use recovery codes** (8, shown once, stored only as bcrypt hashes) so a lost phone cannot lock the owner out permanently.
+- **Disabling two-factor requires the password**, so a stolen session alone cannot strip the second factor. Enabling it revokes all other sessions.
+- **Per-account lockout with doubling backoff** (5 failures → 15 min, doubling to a 6-hour cap) *on top of* the per-IP rate limit, which a rotating-IP attacker could otherwise sidestep. Locks always expire, so an attacker cannot permanently deny the owner access. A locked account is refused before the password is even checked.
+- **A separate, tighter rate limit** on the owner portal specifically.
+- **Short sessions:** 2 hours idle and 12 hours absolute for the owner, versus 7/30 days for guests — both enforced server-side, and the idle window can never slide past the absolute deadline.
+- **`__Host-` cookie prefix in production**, so the session cookie cannot be overwritten by a subdomain.
+- **Session visibility and remote revoke:** every signed-in device with its IP, user agent and last-seen time, revocable individually or all at once. Revocation is scoped to the caller's own user id.
+- **A sign-in audit trail** (IP, device, outcome) surfaced in the dashboard, so an intrusion attempt is visible rather than silent.
+- **A stronger password policy** (12+ characters, two character classes, common passwords refused).
+- **Portal isolation:** the owner cannot sign in through the guest portal and vice versa, and using the wrong portal returns *exactly* the same error as a wrong password — so the portals cannot be used to discover which address is the owner's.
+
+### Everything else
+
+- **SQL injection** — every query uses prepared statements with bound parameters; no string-built SQL anywhere. Status filters are checked against an allow-list.
+- **XSS** — the frontend builds all DOM through `textContent`/`createTextNode` and never uses `innerHTML`, so room text cannot become markup. A strict CSP (`default-src 'self'`, no inline scripts) enforces it a second time.
+- **Malicious uploads** — photos are accepted only after the real type is confirmed by **magic-byte sniffing**, never the declared `Content-Type`. SVG is deliberately unsupported because it can carry script. Capped at 2 MB and 20 photos per gallery, served with the sniffed type plus `nosniff`.
+- **Broken access control** — each route names exactly which roles may reach it. Guests cannot touch owner endpoints, cannot approve their own bookings, and the owner cannot book through the guest route.
+- **IDOR** — bookings are scoped to the signed-in guest in the `WHERE` clause; another guest's booking returns 404 rather than 403, so its existence is never confirmed.
+- **CSRF** — `SameSite=Strict` cookies plus an `Origin`/`Referer` check on every state-changing request.
+- **Session hijacking** — 256-bit tokens stored server-side only as SHA-256 hashes, so a database leak yields no usable session.
+- **User enumeration** — login compares against a dummy bcrypt hash when the account doesn't exist, keeping timing and responses identical.
+- **Price tampering** — totals are computed server-side from the stored nightly rate; a client-sent price is ignored. Money is integer-only, so totals cannot drift through floating-point rounding.
+- **Double booking** — the availability check and insert run in one immediate transaction; concurrent requests for the same nights cannot both succeed. Same-day changeover is allowed by design.
+- **Double approval** — deciding a request is atomic and only applies to a pending one, so a double-click cannot approve twice or race a decline.
+- **Open redirect** — the post-login `?next=` is honoured only for same-origin relative paths.
+- **Data loss** — deleting a room with live bookings is refused; unpublishing hides it without destroying stays guests rely on.
+- **DoS** — rate limiting everywhere, JSON bodies capped at 10 KB, uploads at 2 MB.
+- **Information leakage** — a central error handler returns generic messages and logs details server-side only; `X-Powered-By` off; Helmet sets CSP, `nosniff`, `frame-ancestors 'none'` and a no-referrer policy.
+- **Secrets** — none in the codebase; all credentials come from the environment; `data/` and `.env` are git-ignored.
+
+For production, run behind TLS (the `Secure` and `__Host-` cookie behaviour activates with `NODE_ENV=production`) and set `TRUST_PROXY=1` behind a single reverse proxy so secure cookies and per-client rate limiting work correctly.
+
+## Deploying
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/nonuprateek1996-ai/Booking-system)
 
-**Render (one click, free):** click the button above, sign in with GitHub, and Render reads `render.yaml` and deploys automatically. You'll get a public `https://booking-system-XXXX.onrender.com` URL. On the free plan the SQLite file is ephemeral (listings, photos and bookings reset on redeploys); attach a persistent disk mounted at `/data` and set `DATA_DIR=/data` to keep data permanently.
+**Render (one click, free):** the button reads `render.yaml` and deploys automatically. On the free plan the SQLite file is ephemeral — rooms, photos and bookings reset on redeploy — so attach a persistent disk mounted at `/data` and set `DATA_DIR=/data` to keep data. Create the owner account from the service's Shell tab with the `create-owner` command above.
 
-**Any Docker host (Railway, Fly.io, a VPS):** a production `Dockerfile` is included:
+**Any Docker host** (Railway, Fly.io, a VPS) — a production `Dockerfile` is included:
 
 ```bash
 docker build -t booking-system .
 docker run -p 3000:3000 -v booking-data:/data booking-system
 ```
 
-Because uploaded photos are stored in the SQLite database, a persistent volume keeps images as well as bookings.
+Photos live in the database, so a persistent volume keeps images as well as bookings.

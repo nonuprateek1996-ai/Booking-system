@@ -21,7 +21,11 @@ export async function api(path, options = {}) {
   const res = await fetch(path, init);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+    // Carry the response fields on the error so callers can react to flags
+    // such as totpRequired without re-parsing the body.
+    const error = new Error(data.error || `Request failed (${res.status})`);
+    Object.assign(error, data, { status: res.status });
+    throw error;
   }
   return data;
 }
@@ -101,8 +105,8 @@ export function mountNav(user) {
 
   if (!user) {
     nav.append(
-      el('a', { href: '/login.html', className: 'nav-link' }, 'Sign in'),
-      el('a', { href: '/owner-login.html', className: 'nav-btn' }, 'List your property')
+      el('a', { href: '/owner-login.html', className: 'nav-link' }, 'Owner'),
+      el('a', { href: '/login.html', className: 'nav-btn' }, 'Sign in to book')
     );
     return;
   }
@@ -110,7 +114,7 @@ export function mountNav(user) {
   if (user.role === 'guest') {
     nav.append(el('a', { href: '/bookings.html', className: 'nav-link' }, 'My trips'));
   } else {
-    nav.append(el('a', { href: '/owner.html', className: 'nav-link' }, 'My properties'));
+    nav.append(el('a', { href: '/owner.html', className: 'nav-link' }, 'Dashboard'));
   }
   nav.append(
     el('span', { className: 'nav-user' }, user.name),

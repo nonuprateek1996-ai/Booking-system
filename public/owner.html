@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My properties — Staylist</title>
+  <title>Owner dashboard — Staylist</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -16,36 +16,134 @@
   <main>
     <p id="message" role="alert" hidden></p>
 
-    <div class="owner-head">
-      <h1>My properties</h1>
-      <button type="button" id="new-btn">Add a property</button>
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab active" data-tab="requests">
+        Requests <span id="pending-badge" class="badge" hidden></span>
+      </button>
+      <button type="button" class="tab" data-tab="rooms">Rooms</button>
+      <button type="button" class="tab" data-tab="place">The place</button>
+      <button type="button" class="tab" data-tab="security">Security</button>
     </div>
 
-    <div class="card" id="new-card" hidden>
-      <h2>New property</h2>
-      <form id="new-form" class="grid-form">
-        <label>Title<input type="text" id="new-title" required maxlength="120"></label>
-        <label>Location<input type="text" id="new-location" required maxlength="120"></label>
-        <label>Price per night (₹)<input type="number" id="new-price" required min="1" step="1"></label>
-        <label>Sleeps<input type="number" id="new-guests" required min="1" max="50" value="2"></label>
-        <label class="full">Description<textarea id="new-description" rows="3" maxlength="2000"></textarea></label>
-        <label>Contact name<input type="text" id="new-contact-name" maxlength="100"></label>
-        <label>Contact email<input type="email" id="new-contact-email" maxlength="254"></label>
-        <label>Contact phone<input type="tel" id="new-contact-phone" maxlength="20"></label>
-        <div class="full form-actions">
-          <button type="submit">Create property</button>
-          <button type="button" id="new-cancel" class="link-btn">Cancel</button>
-        </div>
-      </form>
-    </div>
-
-    <div id="properties"></div>
-    <p id="empty" class="empty" hidden>You have not listed any properties yet.</p>
-
-    <section>
-      <h2>Bookings on my properties</h2>
+    <!-- Booking requests -->
+    <section id="panel-requests" class="panel">
+      <h1>Booking requests</h1>
+      <p class="hint" id="transport-note"></p>
       <div id="bookings"></div>
-      <p id="no-bookings" class="empty" hidden>No bookings yet.</p>
+      <p id="no-bookings" class="empty" hidden>No booking requests yet.</p>
+    </section>
+
+    <!-- Rooms -->
+    <section id="panel-rooms" class="panel" hidden>
+      <div class="owner-head">
+        <h1>Rooms</h1>
+        <button type="button" id="new-room-btn">Add a room</button>
+      </div>
+
+      <div class="card" id="new-room-card" hidden>
+        <h2>New room</h2>
+        <form id="new-room-form" class="grid-form">
+          <label>Room name<input type="text" id="new-name" required maxlength="80"></label>
+          <label>Price per night (₹)<input type="number" id="new-price" required min="1" step="1"></label>
+          <label>Sleeps<input type="number" id="new-guests" required min="1" max="50" value="2"></label>
+          <label class="full">Description<textarea id="new-description" rows="2" maxlength="2000"></textarea></label>
+          <div class="full form-actions">
+            <button type="submit">Create room</button>
+            <button type="button" id="new-room-cancel" class="link-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="rooms"></div>
+      <p id="no-rooms" class="empty" hidden>No rooms yet. Add your first one.</p>
+    </section>
+
+    <!-- The guesthouse itself -->
+    <section id="panel-place" class="panel" hidden>
+      <h1>The place</h1>
+      <div class="card">
+        <form id="property-form" class="grid-form">
+          <label>Name<input type="text" id="p-name" required maxlength="120"></label>
+          <label>Location<input type="text" id="p-location" required maxlength="120"></label>
+          <label class="full">Tagline<input type="text" id="p-tagline" maxlength="160"></label>
+          <label class="full">About<textarea id="p-about" rows="4" maxlength="4000"></textarea></label>
+          <label class="full">Address<input type="text" id="p-address" maxlength="300"></label>
+          <label>Contact name<input type="text" id="p-contact-name" maxlength="100"></label>
+          <label>Contact email<input type="email" id="p-contact-email" maxlength="254"></label>
+          <label>Contact phone<input type="tel" id="p-contact-phone" maxlength="20"></label>
+          <label>Check-in time<input type="time" id="p-check-in"></label>
+          <label>Check-out time<input type="time" id="p-check-out"></label>
+          <label class="full">House rules<textarea id="p-house-rules" rows="3" maxlength="2000"></textarea></label>
+          <div class="full form-actions"><button type="submit">Save</button></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Photos of the place</h2>
+        <p class="hint">Shown in the gallery on your home page. JPEG, PNG or WebP · up to 2 MB each.</p>
+        <div id="property-photos" class="photo-strip"></div>
+        <input type="file" id="property-photo-input" accept="image/jpeg,image/png,image/webp">
+      </div>
+    </section>
+
+    <!-- Security -->
+    <section id="panel-security" class="panel" hidden>
+      <h1>Security</h1>
+
+      <div class="card">
+        <h2>Two-factor authentication</h2>
+        <p id="twofa-state" class="hint"></p>
+        <div id="twofa-off">
+          <p>Add a second step to sign-in using any authenticator app. Strongly recommended: it means a
+            stolen password alone cannot reach your dashboard.</p>
+          <button type="button" id="twofa-start">Set up two-factor</button>
+          <div id="twofa-setup" hidden>
+            <p class="hint">Scan this in your authenticator app, or enter the key by hand:</p>
+            <p><code id="twofa-secret" class="secret"></code></p>
+            <p><a id="twofa-uri" href="#" class="link-btn">Open in an authenticator app</a></p>
+            <form id="twofa-enable-form" class="inline-form">
+              <input type="text" id="twofa-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" required>
+              <button type="submit">Turn it on</button>
+            </form>
+          </div>
+        </div>
+        <div id="twofa-on" hidden>
+          <p id="recovery-count" class="hint"></p>
+          <form id="twofa-disable-form" class="inline-form">
+            <input type="password" id="twofa-password" placeholder="Your password" required autocomplete="current-password">
+            <button type="submit" class="danger-btn">Turn two-factor off</button>
+          </form>
+          <form id="recovery-regen-form" class="inline-form">
+            <input type="password" id="recovery-password" placeholder="Your password" required autocomplete="current-password">
+            <button type="submit">New recovery codes</button>
+          </form>
+        </div>
+        <div id="recovery-display" class="recovery-box" hidden>
+          <p><strong>Save these recovery codes now — they are shown only once.</strong></p>
+          <ul id="recovery-list"></ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Change password</h2>
+        <form id="password-form" class="grid-form">
+          <label>Current password<input type="password" id="current-password" required autocomplete="current-password"></label>
+          <label>New password (12+ characters)<input type="password" id="new-password" required minlength="12" autocomplete="new-password"></label>
+          <div class="full form-actions"><button type="submit">Change password</button></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Signed-in devices</h2>
+        <div id="sessions"></div>
+        <button type="button" id="revoke-others" class="danger-btn">Sign out everywhere else</button>
+      </div>
+
+      <div class="card">
+        <h2>Recent sign-in activity</h2>
+        <p class="hint">Anything here you do not recognise means someone else has your password.</p>
+        <div id="audit"></div>
+      </div>
     </section>
   </main>
 

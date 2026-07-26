@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room — Staylist</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><span id="brand-name">Staylist</span></a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="detail">
+    <p id="message" role="alert" hidden></p>
+    <a class="back-link" href="/">← All rooms</a>
+
+    <h1 id="room-name"></h1>
+    <p id="room-sleeps" class="detail-location"></p>
+
+    <div id="gallery" class="gallery"></div>
+
+    <div class="detail-columns">
+      <div>
+        <section>
+          <h2>About this room</h2>
+          <p id="room-description" class="detail-description"></p>
+        </section>
+
+        <section id="booked-section" hidden>
+          <h2>Not available</h2>
+          <ul id="booked" class="booked"></ul>
+        </section>
+
+        <section>
+          <h2>Contact the owner</h2>
+          <p id="contact-name"></p>
+          <p id="contact-phone"></p>
+          <p id="contact-email"></p>
+        </section>
+      </div>
+
+      <aside>
+        <div class="card booking-card">
+          <p id="price" class="detail-price"></p>
+          <form id="booking-form">
+            <label>Check in<input type="date" id="checkIn" required></label>
+            <label>Check out<input type="date" id="checkOut" required></label>
+            <label>Guests<input type="number" id="guests" value="1" min="1" required></label>
+            <label>Message to the owner (optional)
+              <textarea id="note" rows="2" maxlength="500" placeholder="Arrival time, questions…"></textarea>
+            </label>
+            <p id="total" class="total"></p>
+            <button type="submit" id="book-btn">Request booking</button>
+          </form>
+          <p id="book-hint" class="hint">The owner reviews each request and confirms it.</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <script type="module" src="/js/room.js"></script>
+</body>
+</html>

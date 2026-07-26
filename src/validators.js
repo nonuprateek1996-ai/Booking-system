@@ -28,9 +28,59 @@ function isValidPassword(password) {
   return typeof password === 'string' && password.length >= 8 && Buffer.byteLength(password, 'utf8') <= 72;
 }
 
-// Only self-service roles; 'admin' can never be requested over the network.
+// Guest is the only role obtainable over the network. Owner and admin exist
+// solely for accounts provisioned server-side by `npm run create-owner`.
 function isValidRole(role) {
   return ROLES.includes(role);
+}
+
+// The owner account controls the whole guesthouse, so it is held to a longer
+// minimum and refuses the passwords attackers try first.
+const WEAK_PASSWORDS = new Set([
+  'password', 'password1', 'password123', 'passw0rd', '12345678', '123456789', '1234567890',
+  'qwerty123', 'qwertyuiop', 'letmein123', 'welcome123', 'admin123', 'administrator',
+  'iloveyou', 'sunshine', 'princess', 'football', 'baseball', 'dragon123', 'monkey123',
+  'abc12345', 'changeme', 'secret123', 'owner123', 'booking123', 'guesthouse',
+]);
+
+function isStrongOwnerPassword(password) {
+  if (typeof password !== 'string') return { ok: false, error: 'A password is required' };
+  if (password.length < 12) {
+    return { ok: false, error: 'Owner passwords must be at least 12 characters' };
+  }
+  if (Buffer.byteLength(password, 'utf8') > 72) {
+    return { ok: false, error: 'Owner passwords must be at most 72 bytes' };
+  }
+  const normalized = password.toLowerCase();
+  if (WEAK_PASSWORDS.has(normalized)) {
+    return { ok: false, error: 'That password is too common — choose something unique' };
+  }
+  if (/^(.)\1+$/.test(password)) {
+    return { ok: false, error: 'That password is a single repeated character' };
+  }
+  // Require some variety rather than a long run of one character class.
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((re) => re.test(password)).length;
+  if (classes < 2) {
+    return {
+      ok: false,
+      error: 'Use at least two of: lower case, upper case, digits, symbols',
+    };
+  }
+  return { ok: true };
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function isValidTime(value) {
+  return typeof value === 'string' && TIME_RE.test(value);
+}
+
+function isValidTotpCode(value) {
+  return typeof value === 'string' && /^\d{6}$/.test(value.trim());
+}
+
+function isValidRecoveryCode(value) {
+  return typeof value === 'string' && /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(value.trim().toUpperCase());
 }
 
 function isValidText(value, max, { required = true } = {}) {
@@ -58,6 +108,26 @@ function isValidRoomName(value) {
 
 function isValidCaption(value) {
   return isValidText(value, 140, { required: false });
+}
+
+function isValidTagline(value) {
+  return isValidText(value, 160, { required: false });
+}
+
+function isValidAbout(value) {
+  return isValidText(value, 4000, { required: false });
+}
+
+function isValidAddress(value) {
+  return isValidText(value, 300, { required: false });
+}
+
+function isValidHouseRules(value) {
+  return isValidText(value, 2000, { required: false });
+}
+
+function isValidNote(value) {
+  return isValidText(value, 500, { required: false });
 }
 
 function isValidPhone(value) {
@@ -152,11 +222,20 @@ module.exports = {
   isValidName,
   isValidPassword,
   isValidRole,
+  isStrongOwnerPassword,
+  isValidTime,
+  isValidTotpCode,
+  isValidRecoveryCode,
   isValidTitle,
   isValidLocation,
   isValidDescription,
   isValidRoomName,
   isValidCaption,
+  isValidTagline,
+  isValidAbout,
+  isValidAddress,
+  isValidHouseRules,
+  isValidNote,
   isValidPhone,
   isValidPrice,
   isValidGuestCount,

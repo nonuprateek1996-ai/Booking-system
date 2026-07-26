@@ -18,31 +18,30 @@ function safeNext(fallback) {
   return fallback;
 }
 
+// Guests can self-register; the owner account never can.
 function setMode(toRegistering) {
   registering = toRegistering;
-  const title = document.getElementById('auth-title');
-  const submit = document.getElementById('submit');
-  const toggle = document.getElementById('toggle');
-  const toggleText = document.getElementById('toggle-text');
-
-  if (registering) {
-    title.textContent = isOwnerPortal ? 'Create an owner account' : 'Create a guest account';
-    submit.textContent = 'Create account';
-    toggle.textContent = 'Sign in instead';
-    toggleText.textContent = 'Already registered?';
-  } else {
-    title.textContent = isOwnerPortal ? 'Sign in to manage your properties' : 'Sign in to book';
-    submit.textContent = 'Sign in';
-    toggle.textContent = isOwnerPortal ? 'Create an owner account' : 'Create a guest account';
-    toggleText.textContent = isOwnerPortal ? 'Want to list a property?' : 'New here?';
-  }
+  document.getElementById('auth-title').textContent = registering ? 'Create a guest account' : 'Sign in to book';
+  document.getElementById('submit').textContent = registering ? 'Create account' : 'Sign in';
+  document.getElementById('toggle').textContent = registering ? 'Sign in instead' : 'Create a guest account';
+  document.getElementById('toggle-text').textContent = registering ? 'Already registered?' : 'New here?';
   document.getElementById('name-row').hidden = !registering;
+  document.getElementById('phone-row').hidden = !registering;
   document.getElementById('name').required = registering;
   document.getElementById('password').autocomplete = registering ? 'new-password' : 'current-password';
   showMessage('');
 }
 
-document.getElementById('toggle').addEventListener('click', () => setMode(!registering));
+if (!isOwnerPortal) {
+  document.getElementById('toggle').addEventListener('click', () => setMode(!registering));
+  setMode(false);
+} else {
+  document.getElementById('use-recovery').addEventListener('click', () => {
+    const row = document.getElementById('recovery-row');
+    row.hidden = !row.hidden;
+    document.getElementById('totpCode').required = row.hidden;
+  });
+}
 
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -53,21 +52,37 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     if (registering) {
       await api('/api/auth/register', {
         method: 'POST',
-        body: { email, password, name: document.getElementById('name').value, role: portal },
+        body: {
+          email,
+          password,
+          name: document.getElementById('name').value,
+          phone: document.getElementById('phone').value,
+        },
       });
     } else {
-      await api('/api/auth/login', { method: 'POST', body: { email, password, portal } });
+      const body = { email, password, portal };
+      if (isOwnerPortal) {
+        const code = document.getElementById('totpCode').value.trim();
+        const recovery = document.getElementById('recoveryCode').value.trim();
+        if (code) body.totpCode = code;
+        if (recovery) body.recoveryCode = recovery;
+      }
+      await api('/api/auth/login', { method: 'POST', body });
     }
     window.location.href = safeNext(home);
   } catch (err) {
+    // A second factor is needed: reveal the code field rather than treating
+    // this as a failure.
+    if (isOwnerPortal && err.totpRequired) {
+      document.getElementById('totp-row').hidden = false;
+      document.getElementById('totpCode').focus();
+    }
     showMessage(err.message);
   }
 });
 
 initPage().then((user) => {
-  // Already signed in: send them straight to the right area.
   if (user) {
     window.location.replace(user.role === 'guest' ? '/bookings.html' : '/owner.html');
   }
 });
-setMode(false);

@@ -14,6 +14,7 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'booking-ratelimit-
 process.env.NODE_ENV = 'test';
 process.env.SEED_DEMO = '0';
 process.env.AUTH_RATE_LIMIT = '3';
+process.env.OWNER_RATE_LIMIT = '3';
 
 const app = require('../src/app');
 

@@ -1,13 +1,13 @@
 {
   "name": "booking-system",
   "version": "1.0.0",
-  "description": "A secure room/resource booking system with user accounts, slot management, and an admin role.",
+  "description": "A secure booking site for a single guesthouse: public browsing, guest bookings, and a hardened owner dashboard.",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "create-admin": "node scripts/create-admin.js",
-    "test": "node --test"
+    "test": "node --test",
+    "create-owner": "node scripts/create-owner.js"
   },
   "engines": {
     "node": ">=18"
@@ -19,6 +19,7 @@
     "cookie-parser": "^1.4.6",
     "express": "^4.21.2",
     "express-rate-limit": "^7.4.0",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "nodemailer": "^9.0.3"
   }
 }
