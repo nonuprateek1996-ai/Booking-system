@@ -14,18 +14,33 @@ const BCRYPT_ROUNDS = 12;
 // login endpoint takes the same time either way (no user-enumeration timing oracle).
 const DUMMY_HASH = bcrypt.hashSync('invalid-password-placeholder', BCRYPT_ROUNDS);
 
-// Tight limits on credential endpoints to blunt brute-force and stuffing attacks.
+// Which account roles may sign in through each portal. Admins use the owner
+// portal; a guest account can never authenticate through the owner portal.
+const PORTAL_ROLES = {
+  guest: ['guest'],
+  owner: ['owner', 'admin'],
+};
+
+// Tight limits on credential endpoints to blunt brute-force and stuffing
+// attacks. Configurable only so the test suite can exercise the app without
+// throttling itself; the default applies in production.
+const AUTH_LIMIT = Number(process.env.AUTH_RATE_LIMIT) || 20;
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: AUTH_LIMIT,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many attempts, please try again later' },
 });
 
+function publicUser(user) {
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
+}
+
 router.post('/register', authLimiter, async (req, res, next) => {
   try {
-    const { email, name, password } = req.body ?? {};
+    const { email, name, password, role } = req.body ?? {};
     if (!v.isValidEmail(email)) {
       return res.status(400).json({ error: 'A valid email address is required' });
     }
@@ -35,14 +50,19 @@ router.post('/register', authLimiter, async (req, res, next) => {
     if (!v.isValidPassword(password)) {
       return res.status(400).json({ error: 'Password must be 8-72 characters' });
     }
+    // Only 'guest' and 'owner' are self-service; 'admin' is rejected here and
+    // can only be granted by the create-admin script on the server.
+    if (!v.isValidRole(role)) {
+      return res.status(400).json({ error: 'Choose whether you are booking or listing a property' });
+    }
 
     const normalized = v.normalizeEmail(email);
     const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     let result;
     try {
       result = db
-        .prepare('INSERT INTO users (email, name, password_hash) VALUES (?, ?, ?)')
-        .run(normalized, name.trim(), hash);
+        .prepare('INSERT INTO users (email, name, password_hash, role) VALUES (?, ?, ?, ?)')
+        .run(normalized, name.trim(), hash, role);
     } catch (err) {
       if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
         return res.status(409).json({ error: 'An account with this email already exists' });
@@ -51,7 +71,9 @@ router.post('/register', authLimiter, async (req, res, next) => {
     }
 
     createSession(res, result.lastInsertRowid);
-    res.status(201).json({ user: { id: result.lastInsertRowid, email: normalized, name: name.trim(), role: 'user' } });
+    res.status(201).json({
+      user: { id: result.lastInsertRowid, email: normalized, name: name.trim(), role },
+    });
   } catch (err) {
     next(err);
   }
@@ -59,7 +81,10 @@ router.post('/register', authLimiter, async (req, res, next) => {
 
 router.post('/login', authLimiter, async (req, res, next) => {
   try {
-    const { email, password } = req.body ?? {};
+    const { email, password, portal } = req.body ?? {};
+    if (!Object.prototype.hasOwnProperty.call(PORTAL_ROLES, portal)) {
+      return res.status(400).json({ error: 'Unknown sign-in portal' });
+    }
     if (!v.isValidEmail(email) || typeof password !== 'string' || password.length > 1024) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
@@ -68,13 +93,21 @@ router.post('/login', authLimiter, async (req, res, next) => {
       .prepare('SELECT id, email, name, role, password_hash FROM users WHERE email = ?')
       .get(v.normalizeEmail(email));
 
-    const ok = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
-    if (!user || !ok) {
+    // Always run the comparison so a wrong password and a missing account are
+    // indistinguishable in both timing and response.
+    const passwordOk = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
+    if (!user || !passwordOk) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Using the wrong portal is reported without confirming the credentials
+    // were correct, so the portals cannot be used to probe account roles.
+    if (!PORTAL_ROLES[portal].includes(user.role)) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     createSession(res, user.id);
-    res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    res.json({ user: publicUser(user) });
   } catch (err) {
     next(err);
   }

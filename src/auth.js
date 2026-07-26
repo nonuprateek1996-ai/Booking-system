@@ -69,15 +69,23 @@ function requireAuth(req, res, next) {
   next();
 }
 
-function requireAdmin(req, res, next) {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
+// Role gate. Admins are deliberately NOT granted every role implicitly —
+// each route lists exactly which roles may reach it.
+function requireRole(...roles) {
+  return function roleGuard(req, res, next) {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ error: 'You do not have access to this area' });
+    }
+    next();
+  };
 }
+
+const requireAdmin = requireRole('admin');
+const requireOwner = requireRole('owner', 'admin');
+const requireGuest = requireRole('guest');
 
 // CSRF defence in depth: the session cookie is SameSite=Strict, and every
 // state-changing request must additionally arrive from our own origin.
@@ -112,7 +120,10 @@ module.exports = {
   destroyAllSessions,
   sessionLoader,
   requireAuth,
+  requireRole,
   requireAdmin,
+  requireOwner,
+  requireGuest,
   csrfProtection,
   pruneExpiredSessions,
 };

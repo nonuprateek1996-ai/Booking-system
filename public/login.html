@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guest sign in — Staylist</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-portal="guest">
+  <header class="site-header">
+    <a class="brand" href="/">Staylist</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main class="narrow">
+    <p id="message" role="alert" hidden></p>
+
+    <div class="card">
+      <p class="portal-tag">Guest account</p>
+      <h1 id="auth-title">Sign in to book</h1>
+
+      <form id="auth-form">
+        <label id="name-row" hidden>Name<input type="text" id="name" maxlength="100" autocomplete="name"></label>
+        <label>Email<input type="email" id="email" required maxlength="254" autocomplete="email"></label>
+        <label>Password<input type="password" id="password" required minlength="8" maxlength="72" autocomplete="current-password"></label>
+        <button type="submit" id="submit">Sign in</button>
+      </form>
+
+      <p class="switch">
+        <span id="toggle-text">New here?</span>
+        <button type="button" id="toggle" class="link-btn">Create a guest account</button>
+      </p>
+      <p class="switch hint">Listing a property instead? <a href="/owner-login.html">Use the owner portal</a>.</p>
+    </div>
+  </main>
+
+  <script type="module" src="/js/login.js"></script>
+</body>
+</html>

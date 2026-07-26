@@ -3,77 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Booking System</title>
+  <title>Staylist — find a place to stay</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header>
-    <h1>Booking System</h1>
-    <div id="user-box" hidden>
-      <span id="user-name"></span>
-      <button id="logout-btn" class="link-btn">Sign out</button>
-    </div>
+  <header class="site-header">
+    <a class="brand" href="/">Staylist</a>
+    <nav id="nav"></nav>
   </header>
+
+  <section class="hero">
+    <h1>Find a place to stay</h1>
+    <p>Browse homes, cottages and villas. No account needed to look around.</p>
+    <form id="search-form" class="search">
+      <input type="search" id="q" placeholder="Where to? Try “Goa”" maxlength="100" aria-label="Search by place or title">
+      <input type="number" id="guests" placeholder="Guests" min="1" max="50" aria-label="Guests">
+      <input type="number" id="maxPrice" placeholder="Max ₹ / night" min="1" step="100" aria-label="Maximum price per night">
+      <button type="submit">Search</button>
+    </form>
+  </section>
 
   <main>
     <p id="message" role="alert" hidden></p>
-
-    <!-- Auth panel -->
-    <section id="auth-panel">
-      <div class="card">
-        <h2 id="auth-title">Sign in</h2>
-        <form id="auth-form" autocomplete="on">
-          <label id="name-row" hidden>
-            Name
-            <input type="text" id="auth-name" maxlength="100" autocomplete="name">
-          </label>
-          <label>
-            Email
-            <input type="email" id="auth-email" required maxlength="254" autocomplete="email">
-          </label>
-          <label>
-            Password
-            <input type="password" id="auth-password" required minlength="8" maxlength="72"
-                   autocomplete="current-password">
-          </label>
-          <button type="submit" id="auth-submit">Sign in</button>
-        </form>
-        <p>
-          <span id="auth-toggle-text">Need an account?</span>
-          <button id="auth-toggle" class="link-btn">Register</button>
-        </p>
-      </div>
-    </section>
-
-    <!-- Booking panel -->
-    <section id="booking-panel" hidden>
-      <div class="card">
-        <h2>Book a resource</h2>
-        <form id="booking-form">
-          <label>
-            Resource
-            <select id="resource-select" required></select>
-          </label>
-          <label>
-            Date
-            <input type="date" id="date-input" required>
-          </label>
-          <label>
-            Time slot
-            <select id="slot-select" required></select>
-          </label>
-          <button type="submit">Book</button>
-        </form>
-      </div>
-
-      <div class="card">
-        <h2>My bookings</h2>
-        <ul id="bookings-list"></ul>
-        <p id="no-bookings" hidden>You have no bookings yet.</p>
-      </div>
-    </section>
+    <div id="results-count" class="results-count"></div>
+    <div id="grid" class="grid"></div>
+    <p id="empty" class="empty" hidden>No properties match your search yet.</p>
   </main>
 
-  <script src="/app.js"></script>
+  <footer class="site-footer">
+    <p>Own a place? <a href="/owner-login.html">List it on Staylist</a>.</p>
+  </footer>
+
+  <script type="module" src="/js/home.js"></script>
 </body>
 </html>

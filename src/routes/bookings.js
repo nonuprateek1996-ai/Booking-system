@@ -2,159 +2,160 @@
 
 const express = require('express');
 const db = require('../db');
-const { requireAuth, requireAdmin } = require('../auth');
+const { requireGuest, requireOwner } = require('../auth');
 const v = require('../validators');
 
 const router = express.Router();
 
-// List active resources (public).
-router.get('/resources', (req, res) => {
-  const resources = db
-    .prepare('SELECT id, name, description FROM resources WHERE active = 1 ORDER BY name')
-    .all();
-  res.json({ resources });
+// Two stays clash when each starts before the other ends. Same-day
+// changeover (one guest's check-out is the next guest's check-in) is allowed.
+const OVERLAP_SQL = `
+  SELECT COUNT(*) AS n FROM bookings
+   WHERE property_id = ? AND check_in < ? AND check_out > ?`;
+
+// Reserve a property atomically: the availability check and the insert run in
+// one immediate transaction, so two simultaneous requests for the same dates
+// cannot both succeed.
+const reserve = db.transaction((booking) => {
+  const clash = db
+    .prepare(OVERLAP_SQL)
+    .get(booking.propertyId, booking.checkOut, booking.checkIn).n;
+  if (clash > 0) {
+    return { conflict: true };
+  }
+  const result = db
+    .prepare(
+      `INSERT INTO bookings (guest_id, property_id, check_in, check_out, guests, total_price)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      booking.guestId,
+      booking.propertyId,
+      booking.checkIn,
+      booking.checkOut,
+      booking.guests,
+      booking.totalPrice
+    );
+  return { id: result.lastInsertRowid };
 });
 
-// Availability for one resource on one date (public).
-router.get('/resources/:id/availability', (req, res) => {
-  if (!v.isValidId(req.params.id) || !v.isValidBookingDate(String(req.query.date ?? ''))) {
-    return res.status(400).json({ error: 'A valid resource id and date (YYYY-MM-DD) are required' });
+// Guests book; owners manage listings and cannot book through this route.
+router.post('/bookings', requireGuest, (req, res) => {
+  const { propertyId, checkIn, checkOut, guests } = req.body ?? {};
+  if (!v.isValidId(propertyId)) {
+    return res.status(400).json({ error: 'A valid property is required' });
   }
-  const resource = db
-    .prepare('SELECT id FROM resources WHERE id = ? AND active = 1')
-    .get(Number(req.params.id));
-  if (!resource) {
-    return res.status(404).json({ error: 'Resource not found' });
+  const stay = v.validateStay(checkIn, checkOut);
+  if (stay.error) {
+    return res.status(400).json({ error: stay.error });
   }
-  const taken = new Set(
-    db
-      .prepare('SELECT slot FROM bookings WHERE resource_id = ? AND date = ?')
-      .all(resource.id, req.query.date)
-      .map((r) => r.slot)
-  );
-  res.json({
-    date: req.query.date,
-    slots: v.SLOTS.map((slot) => ({ slot, available: !taken.has(slot) })),
+  const guestCount = guests === undefined ? 1 : guests;
+  if (!v.isValidGuestCount(guestCount)) {
+    return res.status(400).json({ error: 'Guest count must be between 1 and 50' });
+  }
+
+  const property = db
+    .prepare('SELECT id, title, price_per_night, max_guests FROM properties WHERE id = ? AND published = 1')
+    .get(Number(propertyId));
+  if (!property) {
+    return res.status(404).json({ error: 'Property not found' });
+  }
+  if (Number(guestCount) > property.max_guests) {
+    return res.status(400).json({ error: `This property sleeps at most ${property.max_guests} guests` });
+  }
+
+  // The total is computed server-side from the stored nightly rate; a price
+  // sent by the client is ignored entirely.
+  const totalPrice = property.price_per_night * stay.nights;
+
+  const outcome = reserve.immediate({
+    guestId: req.user.id,
+    propertyId: property.id,
+    checkIn,
+    checkOut,
+    guests: Number(guestCount),
+    totalPrice,
   });
-});
-
-// Create a booking for the signed-in user.
-router.post('/bookings', requireAuth, (req, res) => {
-  const { resourceId, date, slot } = req.body ?? {};
-  if (!v.isValidId(resourceId)) {
-    return res.status(400).json({ error: 'A valid resource is required' });
-  }
-  if (!v.isValidBookingDate(date)) {
-    return res.status(400).json({ error: `Date must be YYYY-MM-DD, today or later, within ${v.MAX_ADVANCE_DAYS} days` });
-  }
-  if (!v.isValidSlot(slot)) {
-    return res.status(400).json({ error: 'Invalid time slot' });
-  }
-
-  const resource = db
-    .prepare('SELECT id, name FROM resources WHERE id = ? AND active = 1')
-    .get(Number(resourceId));
-  if (!resource) {
-    return res.status(404).json({ error: 'Resource not found' });
-  }
-
-  // The UNIQUE(resource_id, date, slot) constraint makes double-booking
-  // impossible even under concurrent requests.
-  let result;
-  try {
-    result = db
-      .prepare('INSERT INTO bookings (user_id, resource_id, date, slot) VALUES (?, ?, ?, ?)')
-      .run(req.user.id, resource.id, date, slot);
-  } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'That slot has already been booked' });
-    }
-    throw err;
+  if (outcome.conflict) {
+    return res.status(409).json({ error: 'Those dates are no longer available' });
   }
 
   res.status(201).json({
-    booking: { id: result.lastInsertRowid, resource: resource.name, resourceId: resource.id, date, slot },
+    booking: {
+      id: outcome.id,
+      property: property.title,
+      propertyId: property.id,
+      checkIn,
+      checkOut,
+      nights: stay.nights,
+      guests: Number(guestCount),
+      totalPrice,
+    },
   });
 });
 
-// The signed-in user's own bookings only.
-router.get('/bookings', requireAuth, (req, res) => {
+// A guest's own bookings only.
+router.get('/bookings', requireGuest, (req, res) => {
   const bookings = db
     .prepare(
-      `SELECT b.id, b.date, b.slot, b.created_at, r.name AS resource, r.id AS resourceId
-         FROM bookings b JOIN resources r ON r.id = b.resource_id
-        WHERE b.user_id = ?
-        ORDER BY b.date, b.slot`
+      `SELECT b.id, b.check_in AS checkIn, b.check_out AS checkOut, b.guests,
+              b.total_price AS totalPrice, b.created_at AS createdAt,
+              p.id AS propertyId, p.title AS property, p.location,
+              p.contact_name AS contactName, p.contact_email AS contactEmail,
+              p.contact_phone AS contactPhone,
+              (SELECT id FROM property_images WHERE property_id = p.id ORDER BY id LIMIT 1) AS coverImageId
+         FROM bookings b JOIN properties p ON p.id = b.property_id
+        WHERE b.guest_id = ?
+        ORDER BY b.check_in DESC`
     )
     .all(req.user.id);
   res.json({ bookings });
 });
 
-// Cancel a booking. Ownership is enforced in the WHERE clause so a user can
-// never cancel (or even probe the existence of) someone else's booking.
-router.delete('/bookings/:id', requireAuth, (req, res) => {
+// Cancel. Ownership is enforced in the WHERE clause, so a guest can never
+// cancel — or probe the existence of — someone else's booking.
+router.delete('/bookings/:id', requireGuest, (req, res) => {
   if (!v.isValidId(req.params.id)) {
     return res.status(400).json({ error: 'Invalid booking id' });
   }
-  const result =
-    req.user.role === 'admin'
-      ? db.prepare('DELETE FROM bookings WHERE id = ?').run(Number(req.params.id))
-      : db.prepare('DELETE FROM bookings WHERE id = ? AND user_id = ?').run(Number(req.params.id), req.user.id);
+  const result = db
+    .prepare('DELETE FROM bookings WHERE id = ? AND guest_id = ?')
+    .run(Number(req.params.id), req.user.id);
   if (result.changes === 0) {
     return res.status(404).json({ error: 'Booking not found' });
   }
   res.json({ ok: true });
 });
 
-// --- Admin endpoints ---
-
-router.get('/admin/bookings', requireAdmin, (req, res) => {
-  const bookings = db
-    .prepare(
-      `SELECT b.id, b.date, b.slot, b.created_at,
-              r.name AS resource, u.email AS userEmail, u.name AS userName
-         FROM bookings b
-         JOIN resources r ON r.id = b.resource_id
-         JOIN users u     ON u.id = b.user_id
-        ORDER BY b.date, b.slot
-        LIMIT 500`
-    )
-    .all();
+// Bookings across the signed-in owner's properties, with the guest's contact
+// details so the owner can reach them.
+router.get('/owner/bookings', requireOwner, (req, res) => {
+  const bookings =
+    req.user.role === 'admin'
+      ? db
+          .prepare(
+            `SELECT b.id, b.check_in AS checkIn, b.check_out AS checkOut, b.guests,
+                    b.total_price AS totalPrice, p.title AS property,
+                    u.name AS guestName, u.email AS guestEmail
+               FROM bookings b
+               JOIN properties p ON p.id = b.property_id
+               JOIN users u      ON u.id = b.guest_id
+              ORDER BY b.check_in DESC LIMIT 500`
+          )
+          .all()
+      : db
+          .prepare(
+            `SELECT b.id, b.check_in AS checkIn, b.check_out AS checkOut, b.guests,
+                    b.total_price AS totalPrice, p.title AS property,
+                    u.name AS guestName, u.email AS guestEmail
+               FROM bookings b
+               JOIN properties p ON p.id = b.property_id
+               JOIN users u      ON u.id = b.guest_id
+              WHERE p.owner_id = ?
+              ORDER BY b.check_in DESC LIMIT 500`
+          )
+          .all(req.user.id);
   res.json({ bookings });
-});
-
-router.post('/admin/resources', requireAdmin, (req, res) => {
-  const { name, description } = req.body ?? {};
-  if (!v.isValidResourceName(name)) {
-    return res.status(400).json({ error: 'Resource name is required (max 120 characters)' });
-  }
-  if (description !== undefined && !v.isValidDescription(description)) {
-    return res.status(400).json({ error: 'Description too long (max 500 characters)' });
-  }
-  let result;
-  try {
-    result = db
-      .prepare('INSERT INTO resources (name, description) VALUES (?, ?)')
-      .run(name.trim(), (description ?? '').trim());
-  } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'A resource with this name already exists' });
-    }
-    throw err;
-  }
-  res.status(201).json({ resource: { id: result.lastInsertRowid, name: name.trim() } });
-});
-
-router.delete('/admin/resources/:id', requireAdmin, (req, res) => {
-  if (!v.isValidId(req.params.id)) {
-    return res.status(400).json({ error: 'Invalid resource id' });
-  }
-  // Soft-delete keeps historical bookings intact.
-  const result = db.prepare('UPDATE resources SET active = 0 WHERE id = ?').run(Number(req.params.id));
-  if (result.changes === 0) {
-    return res.status(404).json({ error: 'Resource not found' });
-  }
-  res.json({ ok: true });
 });
 
 module.exports = router;

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My properties — Staylist</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">Staylist</a>
+    <nav id="nav"></nav>
+  </header>
+
+  <main>
+    <p id="message" role="alert" hidden></p>
+
+    <div class="owner-head">
+      <h1>My properties</h1>
+      <button type="button" id="new-btn">Add a property</button>
+    </div>
+
+    <div class="card" id="new-card" hidden>
+      <h2>New property</h2>
+      <form id="new-form" class="grid-form">
+        <label>Title<input type="text" id="new-title" required maxlength="120"></label>
+        <label>Location<input type="text" id="new-location" required maxlength="120"></label>
+        <label>Price per night (₹)<input type="number" id="new-price" required min="1" step="1"></label>
+        <label>Sleeps<input type="number" id="new-guests" required min="1" max="50" value="2"></label>
+        <label class="full">Description<textarea id="new-description" rows="3" maxlength="2000"></textarea></label>
+        <label>Contact name<input type="text" id="new-contact-name" maxlength="100"></label>
+        <label>Contact email<input type="email" id="new-contact-email" maxlength="254"></label>
+        <label>Contact phone<input type="tel" id="new-contact-phone" maxlength="20"></label>
+        <div class="full form-actions">
+          <button type="submit">Create property</button>
+          <button type="button" id="new-cancel" class="link-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="properties"></div>
+    <p id="empty" class="empty" hidden>You have not listed any properties yet.</p>
+
+    <section>
+      <h2>Bookings on my properties</h2>
+      <div id="bookings"></div>
+      <p id="no-bookings" class="empty" hidden>No bookings yet.</p>
+    </section>
+  </main>
+
+  <script type="module" src="/js/owner.js"></script>
+</body>
+</html>

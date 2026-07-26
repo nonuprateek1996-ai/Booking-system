@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { sessionLoader, csrfProtection, pruneExpiredSessions } = require('./auth');
 const authRoutes = require('./routes/auth');
+const propertyRoutes = require('./routes/properties');
 const bookingRoutes = require('./routes/bookings');
 
 const app = express();
@@ -43,7 +44,7 @@ app.use(
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 500,
+    limit: Number(process.env.GLOBAL_RATE_LIMIT) || 500,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later' },
@@ -57,6 +58,7 @@ app.use(sessionLoader);
 app.use(csrfProtection);
 
 app.use('/api/auth', authRoutes);
+app.use('/api', propertyRoutes);
 app.use('/api', bookingRoutes);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -69,7 +71,10 @@ app.use('/api', (req, res) => {
 // Central error handler: log details server-side, never leak them to clients.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'That file or request is too large' });
+  }
+  if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Invalid request body' });
   }
   console.error(err);
