@@ -5,7 +5,7 @@ services:
     plan: free
     buildCommand: npm ci
     startCommand: npm start
-    healthCheckPath: /api/resources
+    healthCheckPath: /api/rooms
     envVars:
       - key: NODE_VERSION
         value: 22.22.2
@@ -15,6 +15,15 @@ services:
         value: 0.0.0.0
       - key: TRUST_PROXY
         value: "1"
+      # The owner account is provisioned from these at startup (no shell
+      # needed). sync: false makes Render prompt for the values securely at
+      # deploy time instead of storing them in the repository.
+      - key: OWNER_EMAIL
+        sync: false
+      - key: OWNER_PASSWORD
+        sync: false
       # Note: on the free plan the filesystem is ephemeral, so the SQLite
-      # database resets on each deploy/restart. Attach a persistent disk
-      # (paid plans) mounted at /data and set DATA_DIR=/data to keep data.
+      # database resets on each deploy/restart (the owner account is
+      # recreated automatically from the variables above). Attach a
+      # persistent disk (paid plans) mounted at /data and set DATA_DIR=/data
+      # to keep rooms, photos and bookings permanently.

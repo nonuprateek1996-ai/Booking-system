@@ -17,15 +17,24 @@ npm start          # serves http://127.0.0.1:3000
 
 The database is created in `data/` and seeded with an example guesthouse and four rooms so the site isn't empty. Set `SEED_DEMO=0` to skip that. **Seed data ships no usable credentials.**
 
-Create the owner account — this is the only way one comes into existence:
+Create the owner account — there are exactly two ways one comes into existence, both server-side:
 
 ```bash
+# One-off, with shell access. Re-running rotates the password and signs out
+# every device, which doubles as the password-reset path.
 OWNER_EMAIL=you@example.com OWNER_PASSWORD='a-strong-password-12+' npm run create-owner
+
+# Or set the same variables in the server's environment: the account is
+# provisioned automatically at startup. This is the supported path on hosts
+# without shell access (e.g. Render's free tier), and it recreates the
+# account on every restart when the filesystem is ephemeral.
 ```
 
-Then sign in at `/owner-login.html` and turn on two-factor authentication under **Security**. Re-running the command rotates the password and signs out every device, which doubles as the password-reset path.
+Startup provisioning never overwrites an existing account, so a routine redeploy cannot clobber a password you changed in the UI. To force a reset from the environment, set `OWNER_FORCE_RESET=1` for one deploy and remove it again (while it is set, every restart rotates the password and revokes all sessions).
 
-Run the test suite (47 tests, mostly security regression tests):
+Then sign in at `/owner-login.html` and turn on two-factor authentication under **Security**.
+
+Run the test suite (52 tests, mostly security regression tests):
 
 ```bash
 npm test
@@ -100,7 +109,7 @@ Every item below is covered by a regression test.
 
 The owner account controls the whole guesthouse, so it is hardened well past the guest accounts:
 
-- **No self-registration.** Registration always produces a guest, whatever the request body claims. The owner exists only via `npm run create-owner`, so no network path can mint one.
+- **No self-registration.** Registration always produces a guest, whatever the request body claims. The owner exists only via `npm run create-owner` or the server's own environment variables at startup, so no network path can mint one.
 - **Two-factor authentication (TOTP)** compatible with any authenticator app, implemented on Node's own crypto — it adds no third-party dependency to the supply chain. Codes are compared in constant time, accepted within one 30-second step either side for clock drift, and **cannot be replayed**: the consumed step is recorded, so a code observed over the shoulder or in a log is dead inside its own window.
 - **Single-use recovery codes** (8, shown once, stored only as bcrypt hashes) so a lost phone cannot lock the owner out permanently.
 - **Disabling two-factor requires the password**, so a stolen session alone cannot strip the second factor. Enabling it revokes all other sessions.
@@ -138,7 +147,7 @@ For production, run behind TLS (the `Secure` and `__Host-` cookie behaviour acti
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/nonuprateek1996-ai/Booking-system)
 
-**Render (one click, free):** the button reads `render.yaml` and deploys automatically. On the free plan the SQLite file is ephemeral — rooms, photos and bookings reset on redeploy — so attach a persistent disk mounted at `/data` and set `DATA_DIR=/data` to keep data. Create the owner account from the service's Shell tab with the `create-owner` command above.
+**Render (one click, free):** the button reads `render.yaml` and deploys automatically. The blueprint prompts for `OWNER_EMAIL` and `OWNER_PASSWORD` at deploy time (they're marked `sync: false`, so they are never stored in the repository), and the owner account is provisioned from them at startup — no shell access needed. On the free plan the SQLite file is ephemeral — rooms, photos, bookings and 2FA enrolment reset on redeploy, and the owner account is recreated automatically from those variables. Attach a persistent disk mounted at `/data` and set `DATA_DIR=/data` (paid plans) to keep data permanently.
 
 **Any Docker host** (Railway, Fly.io, a VPS) — a production `Dockerfile` is included:
 
