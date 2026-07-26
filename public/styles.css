@@ -330,6 +330,31 @@ body.menu-open .drawer a, body.menu-open .drawer button { transform: translateX(
     linear-gradient(to bottom, rgba(247, 250, 245, 0.8) 0%, rgba(236, 243, 234, 0.62) 45%, rgba(222, 233, 220, 0.84) 100%);
 }
 
+/* A bundled artwork gets a lighter touch: a soft wash over the top third,
+   where the heading sits against pale sky, and a dark foot so the white
+   standfirst stays legible over foliage. */
+.hero.has-image .hero-scrim {
+  background:
+    linear-gradient(to bottom,
+      rgba(250, 248, 240, 0.62) 0%,
+      rgba(248, 246, 238, 0.34) 30%,
+      rgba(240, 240, 230, 0.08) 52%,
+      rgba(31, 42, 29, 0.34) 82%,
+      rgba(24, 33, 22, 0.62) 100%);
+}
+
+.hero.has-image .hero-foot-mark,
+.hero.has-image .hero-foot p,
+.hero.has-image .hero-foot-actions .secondary { color: #fff; }
+
+.hero.has-image .hero-foot p { color: rgba(255, 255, 255, 0.9); }
+
+.hero.has-image .hero-foot-actions .primary { background: #fff; color: var(--ink); }
+.hero.has-image .hero-foot-actions .primary:hover { background: rgba(255, 255, 255, 0.9); }
+
+.hero.has-image .scroll-cue { color: rgba(255, 255, 255, 0.95); }
+.hero.has-image .scroll-cue .dot { background: rgba(255, 255, 255, 0.22); }
+
 .hero-inner {
   position: relative;
   z-index: 10;

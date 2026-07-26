@@ -928,3 +928,27 @@ test('the health check endpoint answers and is not rate limited', async () => {
   assert.strictEqual(body.status, 'ok');
   assert.strictEqual(results[0].headers.get('ratelimit-limit'), null, 'not counted by the limiter');
 });
+
+test('the hero artwork is reported only when a file is actually present', async () => {
+  const fsp = require('fs');
+  const pth = require('path');
+  const target = pth.join(__dirname, '..', 'public', 'hero.png');
+  const anon = client();
+
+  const before = await anon('GET', '/api/property');
+  assert.strictEqual(before.data.heroImage, null, 'nothing reported when no artwork is bundled');
+
+  // A one-pixel PNG stands in for the artwork.
+  fsp.writeFileSync(target, PNG_1X1);
+  try {
+    const during = await anon('GET', '/api/property');
+    assert.strictEqual(during.data.heroImage, '/hero.png');
+    const served = await fetch(`${baseUrl}/hero.png`);
+    assert.strictEqual(served.status, 200);
+  } finally {
+    fsp.rmSync(target, { force: true });
+  }
+
+  const after = await anon('GET', '/api/property');
+  assert.strictEqual(after.data.heroImage, null, 'reported again as absent once removed');
+});

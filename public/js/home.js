@@ -15,6 +15,20 @@ const SECTION_LINKS = [
 
 // ---------- Hero background ----------
 
+// A bundled hero artwork, if one has been added to /public. The server tells
+// us whether it exists, so there is nothing to probe for. It takes precedence
+// over the room photographs: it is a chosen backdrop rather than a gallery,
+// so it stays put instead of cycling.
+function mountStaticHero(src, name) {
+  const host = document.getElementById('hero-bg');
+  if (!host || !src) return false;
+  host.replaceChildren(el('img', { src, alt: name, className: 'active', fetchpriority: 'high' }));
+  // Switches the scrim and footer text to the treatment a photographic
+  // backdrop needs: light sky at the top, dark foliage below.
+  document.querySelector('.hero').classList.add('has-image');
+  return true;
+}
+
 // The guesthouse's own photographs, crossfading slowly. Honours
 // prefers-reduced-motion by holding a single still frame instead.
 function mountHeroBackground(imageIds, name) {
@@ -125,7 +139,7 @@ function renderGallery(imageIds, name) {
 }
 
 async function loadProperty() {
-  const { property, imageIds } = await api('/api/property');
+  const { property, imageIds, heroImage } = await api('/api/property');
 
   document.title = `${property.name} — book a room`;
   document.getElementById('brand-name').textContent = property.name;
@@ -159,7 +173,10 @@ async function loadProperty() {
   document.getElementById('check-times').textContent =
     `Check in from ${property.checkInTime} · check out by ${property.checkOutTime}`;
 
-  mountHeroBackground(imageIds, property.name);
+  // A bundled artwork wins; otherwise the owner's own photos carry the hero.
+  if (!mountStaticHero(heroImage, property.name)) {
+    mountHeroBackground(imageIds, property.name);
+  }
   renderGallery(imageIds, property.name);
 }
 

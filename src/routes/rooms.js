@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const db = require('../db');
 const { requireOwner } = require('../auth');
@@ -26,6 +28,20 @@ function propertyImageIds() {
     .map((r) => r.id);
 }
 
+// An optional hero artwork bundled into /public. Reported by the API so the
+// page never has to probe for it and take 404s on every load.
+const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
+const HERO_CANDIDATES = ['hero.webp', 'hero.jpg', 'hero.png'];
+
+function heroImagePath() {
+  for (const name of HERO_CANDIDATES) {
+    if (fs.existsSync(path.join(PUBLIC_DIR, name))) {
+      return `/${name}`;
+    }
+  }
+  return null;
+}
+
 // --- Public: the guesthouse and its rooms ---
 
 router.get('/property', (req, res) => {
@@ -38,7 +54,7 @@ router.get('/property', (req, res) => {
          FROM property WHERE id = 1`
     )
     .get();
-  res.json({ property: p, imageIds: propertyImageIds() });
+  res.json({ property: p, imageIds: propertyImageIds(), heroImage: heroImagePath() });
 });
 
 // Room list, optionally filtered to those free for a given stay.
