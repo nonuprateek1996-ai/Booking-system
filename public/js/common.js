@@ -97,49 +97,122 @@ export async function fetchUser() {
   }
 }
 
-// Renders the header navigation for the current user.
-export function mountNav(user) {
+async function signOut() {
+  try {
+    await api('/api/auth/logout', { method: 'POST', body: {} });
+  } catch {
+    /* session may already be gone — send them home regardless */
+  }
+  window.location.href = '/';
+}
+
+// The links and actions a given user should see, as plain descriptors so the
+// pill, the inline actions and the mobile drawer all stay in step.
+function navEntries(user) {
+  if (!user) {
+    return [
+      { label: 'Owner', href: '/owner-login.html' },
+      { label: 'Sign in to book', href: '/login.html', primary: true },
+    ];
+  }
+  const home = user.role === 'guest'
+    ? { label: 'My trips', href: '/bookings.html' }
+    : { label: 'Dashboard', href: '/owner.html' };
+  return [home, { label: 'Sign out', onClick: signOut }];
+}
+
+function entryNode(entry, className) {
+  if (entry.onClick) {
+    return el('button', { type: 'button', className, onClick: entry.onClick }, entry.label);
+  }
+  return el('a', { href: entry.href, className }, entry.label);
+}
+
+// Renders the header navigation, plus a mobile drawer holding the same items.
+export function mountNav(user, sectionLinks = []) {
   const nav = document.getElementById('nav');
   if (!nav) return;
-  nav.replaceChildren();
 
-  if (!user) {
-    nav.append(
-      el('a', { href: '/owner-login.html', className: 'nav-link' }, 'Owner'),
-      el('a', { href: '/login.html', className: 'nav-btn' }, 'Sign in to book')
+  const entries = navEntries(user);
+
+  // Desktop pill: in-page section links plus the primary action.
+  const pill = document.getElementById('nav-pill');
+  if (pill && sectionLinks.length > 0) {
+    pill.replaceChildren(
+      ...sectionLinks.map((link, i) =>
+        el('a', { href: link.href, className: i === 0 ? 'current' : '' }, link.label)
+      ),
+      entryNode(entries.find((e) => e.primary) ?? entries.at(-1), 'nav-btn')
     );
-    return;
   }
 
-  if (user.role === 'guest') {
-    nav.append(el('a', { href: '/bookings.html', className: 'nav-link' }, 'My trips'));
-  } else {
-    nav.append(el('a', { href: '/owner.html', className: 'nav-link' }, 'Dashboard'));
-  }
-  nav.append(
-    el('span', { className: 'nav-user' }, user.name),
+  // Inline actions. The primary button is marked so CSS can hide it on wide
+  // screens, where the pill already carries it.
+  nav.replaceChildren(
+    ...(user ? [el('span', { className: 'nav-user' }, user.name)] : []),
+    ...entries.map((e) =>
+      entryNode(e, e.primary && pill ? 'nav-btn in-actions' : e.primary ? 'nav-btn' : 'nav-link')
+    ),
     el(
       'button',
       {
-        className: 'nav-link',
+        className: 'menu-btn',
         type: 'button',
-        onClick: async () => {
-          try {
-            await api('/api/auth/logout', { method: 'POST', body: {} });
-          } catch {
-            /* session may already be gone — send them home regardless */
-          }
-          window.location.href = '/';
-        },
+         'aria-label': 'Menu',
+        'aria-expanded': 'false',
+        onClick: toggleDrawer,
       },
-      'Sign out'
+      el('span', {}),
+      el('span', {}),
+      el('span', {})
     )
   );
+
+  mountDrawer(sectionLinks, entries);
+}
+
+function toggleDrawer() {
+  const open = document.body.classList.toggle('menu-open');
+  document.body.style.overflow = open ? 'hidden' : '';
+  const button = document.querySelector('.menu-btn');
+  if (button) button.setAttribute('aria-expanded', String(open));
+}
+
+function closeDrawer() {
+  document.body.classList.remove('menu-open');
+  document.body.style.overflow = '';
+  const button = document.querySelector('.menu-btn');
+  if (button) button.setAttribute('aria-expanded', 'false');
+}
+
+function mountDrawer(sectionLinks, entries) {
+  document.querySelectorAll('.drawer, .drawer-scrim').forEach((n) => n.remove());
+
+  const scrim = el('div', { className: 'drawer-scrim', onClick: closeDrawer });
+  const drawer = el(
+    'div',
+    { className: 'drawer' },
+    ...sectionLinks.map((link) =>
+      el('a', { href: link.href, onClick: closeDrawer }, link.label)
+    ),
+    ...entries.map((e) =>
+      e.onClick
+        ? el('button', { type: 'button', onClick: e.onClick }, e.label)
+        : el('a', { href: e.href, onClick: closeDrawer }, e.label)
+    )
+  );
+
+  document.body.append(scrim, drawer);
+
+  // Escape closes it, which keyboard users expect.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDrawer();
+  });
 }
 
 // Standard page bootstrap: resolve the user, draw the nav, hand it back.
-export async function initPage() {
+export async function initPage(sectionLinks = []) {
   const user = await fetchUser();
-  mountNav(user);
+  mountNav(user, sectionLinks);
   return user;
 }

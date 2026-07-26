@@ -4,51 +4,80 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Staylist — book a room</title>
+  <meta name="description" content="Book a room at our guesthouse. Browse the rooms, check availability and request your stay.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-  <header class="site-header">
-    <a class="brand" href="/"><span id="brand-name">Staylist</span></a>
-    <nav id="nav"></nav>
-  </header>
-
+<body class="has-hero">
   <section class="hero">
-    <h1 id="property-name">Loading…</h1>
-    <p id="property-tagline"></p>
-    <p id="property-location" class="hero-location"></p>
-    <form id="search-form" class="search">
-      <label class="search-field">
-        <span>Check in</span>
-        <input type="date" id="checkIn">
-      </label>
-      <label class="search-field">
-        <span>Check out</span>
-        <input type="date" id="checkOut">
-      </label>
-      <label class="search-field narrow">
-        <span>Guests</span>
-        <input type="number" id="guests" placeholder="Any" min="1" max="50">
-      </label>
-      <button type="submit">Check availability</button>
-    </form>
+    <div class="hero-bg" id="hero-bg"></div>
+    <div class="hero-scrim"></div>
+
+    <header class="site-header">
+      <a class="brand" href="/"><span id="brand-name">Staylist</span></a>
+      <div class="nav-pill" id="nav-pill"></div>
+      <div class="nav-actions" id="nav"></div>
+    </header>
+
+    <div class="hero-inner">
+      <h1 id="hero-heading">
+        <span id="hero-name">Loading…</span>
+      </h1>
+      <p class="hero-tagline" id="hero-tagline"></p>
+      <p class="hero-place" id="hero-place"></p>
+
+      <form class="search" id="search-form">
+        <label class="search-field">
+          <span>Check in</span>
+          <input type="date" id="checkIn">
+        </label>
+        <label class="search-field">
+          <span>Check out</span>
+          <input type="date" id="checkOut">
+        </label>
+        <label class="search-field narrow">
+          <span>Guests</span>
+          <input type="number" id="guests" placeholder="Any" min="1" max="50">
+        </label>
+        <button type="submit">Check availability</button>
+      </form>
+    </div>
+
+    <div class="hero-foot">
+      <div class="hero-foot-mark">
+        <span aria-hidden="true">✦</span>
+        <span id="foot-mark-name">Our rooms</span>
+      </div>
+      <p id="foot-blurb">
+        Every room is booked individually, with its own price and photos. Pick your dates and the
+        owner confirms your stay personally.
+      </p>
+      <div class="hero-foot-actions">
+        <a class="primary" href="#rooms">See the rooms</a>
+        <a class="secondary" href="#about">About the place</a>
+      </div>
+    </div>
+
+    <a class="scroll-cue" href="#rooms">
+      <span class="dot" aria-hidden="true">↓</span>
+      <span>Rooms &amp; availability</span>
+    </a>
   </section>
 
   <main>
     <p id="message" role="alert" hidden></p>
 
-    <div id="gallery" class="gallery"></div>
-
-    <section class="about-columns">
+    <section id="about" class="about-columns">
       <div>
-        <h2>About the place</h2>
+        <h2 class="section-head">About the place</h2>
         <p id="property-about" class="detail-description"></p>
         <div id="house-rules-block" hidden>
-          <h2>House rules</h2>
+          <h2 class="section-head spaced">House rules</h2>
           <p id="house-rules" class="detail-description"></p>
         </div>
       </div>
-      <aside class="card contact-card">
+      <aside class="card contact-card" id="contact">
         <h2>Contact the owner</h2>
         <p id="contact-name"></p>
         <p id="contact-phone"></p>
@@ -58,10 +87,14 @@
       </aside>
     </section>
 
-    <h2 id="rooms-heading">Rooms</h2>
-    <div id="results-count" class="results-count"></div>
-    <div id="grid" class="grid"></div>
-    <p id="empty" class="empty" hidden>No rooms are free for those dates. Try different nights.</p>
+    <div id="gallery" class="gallery" hidden></div>
+
+    <section id="rooms">
+      <h2 class="section-head">Rooms</h2>
+      <div id="results-count" class="results-count"></div>
+      <div id="grid" class="grid"></div>
+      <p id="empty" class="empty" hidden>No rooms are free for those dates. Try different nights.</p>
+    </section>
   </main>
 
   <footer class="site-footer">

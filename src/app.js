@@ -31,6 +31,9 @@ app.use(
         scriptSrc: ["'self'"],
         styleSrc: ["'self'"],
         imgSrc: ["'self'", 'data:'],
+        // Fonts are self-hosted, so no external font host is permitted —
+        // tighter than Helmet's default, which allows any https origin.
+        fontSrc: ["'self'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],

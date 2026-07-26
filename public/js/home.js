@@ -7,6 +7,47 @@ const empty = document.getElementById('empty');
 const count = document.getElementById('results-count');
 const FIELDS = ['checkIn', 'checkOut', 'guests'];
 
+const SECTION_LINKS = [
+  { href: '#rooms', label: 'Rooms' },
+  { href: '#about', label: 'The place' },
+  { href: '#contact', label: 'Contact' },
+];
+
+// ---------- Hero background ----------
+
+// The guesthouse's own photographs, crossfading slowly. Honours
+// prefers-reduced-motion by holding a single still frame instead.
+function mountHeroBackground(imageIds, name) {
+  const host = document.getElementById('hero-bg');
+  if (!host || imageIds.length === 0) return; // CSS gradient stands in
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const ids = reduceMotion ? imageIds.slice(0, 1) : imageIds.slice(0, 6);
+
+  const layers = ids.map((id, i) =>
+    el('img', {
+      src: `/api/images/${id}`,
+      alt: i === 0 ? `${name}` : '',
+      className: i === 0 ? 'active' : '',
+      // Only the first image blocks the hero; the rest arrive lazily.
+      loading: i === 0 ? 'eager' : 'lazy',
+      'aria-hidden': i === 0 ? null : 'true',
+    })
+  );
+  host.replaceChildren(...layers);
+
+  if (reduceMotion || layers.length < 2) return;
+
+  let current = 0;
+  window.setInterval(() => {
+    layers[current].classList.remove('active');
+    current = (current + 1) % layers.length;
+    layers[current].classList.add('active');
+  }, 6500);
+}
+
+// ---------- Rooms ----------
+
 function roomCard(room) {
   const media = room.coverImageId
     ? el('img', {
@@ -54,42 +95,54 @@ function roomCard(room) {
 
 function renderGallery(imageIds, name) {
   const gallery = document.getElementById('gallery');
-  if (imageIds.length === 0) {
-    gallery.hidden = true;
-    return;
-  }
-  const main = el('img', { className: 'gallery-main', src: `/api/images/${imageIds[0]}`, alt: `Photo of ${name}` });
-  gallery.replaceChildren(main);
-  if (imageIds.length > 1) {
-    gallery.append(
-      el(
-        'div',
-        { className: 'thumbs' },
-        imageIds.map((id) =>
-          el('img', {
-            className: 'thumb',
-            src: `/api/images/${id}`,
-            alt: `Photo of ${name}`,
-            loading: 'lazy',
-            onClick: () => {
-              main.src = `/api/images/${id}`;
-            },
-          })
-        )
+  if (!gallery || imageIds.length < 2) return;
+  gallery.hidden = false;
+
+  const main = el('img', {
+    className: 'gallery-main',
+    src: `/api/images/${imageIds[0]}`,
+    alt: `Photo of ${name}`,
+    loading: 'lazy',
+  });
+  gallery.replaceChildren(
+    main,
+    el(
+      'div',
+      { className: 'thumbs' },
+      imageIds.map((id) =>
+        el('img', {
+          className: 'thumb',
+          src: `/api/images/${id}`,
+          alt: '',
+          loading: 'lazy',
+          onClick: () => {
+            main.src = `/api/images/${id}`;
+          },
+        })
       )
-    );
-  }
+    )
+  );
 }
 
 async function loadProperty() {
   const { property, imageIds } = await api('/api/property');
+
   document.title = `${property.name} — book a room`;
   document.getElementById('brand-name').textContent = property.name;
-  document.getElementById('property-name').textContent = property.name;
-  document.getElementById('property-tagline').textContent = property.tagline;
-  document.getElementById('property-location').textContent = property.location;
-  document.getElementById('property-about').textContent = property.about || 'No description yet.';
+  document.getElementById('foot-mark-name').textContent = property.name;
 
+  // The heading reads as the reference does: name, then a lighter accent clause.
+  const heading = document.getElementById('hero-heading');
+  heading.replaceChildren(
+    el('span', {}, property.name),
+    property.tagline ? el('br', {}) : null,
+    property.tagline ? el('span', { className: 'accent' }, property.tagline) : null
+  );
+  document.getElementById('hero-tagline').textContent =
+    property.about ? property.about.split('. ')[0].replace(/\.$/, '') + '.' : '';
+  document.getElementById('hero-place').textContent = property.location;
+
+  document.getElementById('property-about').textContent = property.about || 'No description yet.';
   if (property.houseRules) {
     document.getElementById('house-rules-block').hidden = false;
     document.getElementById('house-rules').textContent = property.houseRules;
@@ -106,10 +159,11 @@ async function loadProperty() {
   document.getElementById('check-times').textContent =
     `Check in from ${property.checkInTime} · check out by ${property.checkOutTime}`;
 
+  mountHeroBackground(imageIds, property.name);
   renderGallery(imageIds, property.name);
 }
 
-async function loadRooms() {
+async function loadRooms({ scroll = false } = {}) {
   const params = new URLSearchParams();
   for (const id of FIELDS) {
     const value = document.getElementById(id).value.trim();
@@ -128,15 +182,20 @@ async function loadRooms() {
       const noun = rooms.length === 1 ? 'room' : 'rooms';
       count.textContent = nights
         ? `${rooms.length} ${noun} free for your ${nights} night${nights === 1 ? '' : 's'}`
-        : `${rooms.length} ${noun}`;
+        : `${rooms.length} ${noun}, booked individually`;
     }
     showMessage('');
+    if (scroll) {
+      document.getElementById('rooms').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   } catch (err) {
     showMessage(err.message);
     grid.replaceChildren();
     count.textContent = '';
   }
 }
+
+// ---------- Date inputs ----------
 
 const checkInInput = document.getElementById('checkIn');
 const checkOutInput = document.getElementById('checkOut');
@@ -153,7 +212,8 @@ checkInInput.addEventListener('change', () => {
 
 document.getElementById('search-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  loadRooms();
+  // Searching from the hero jumps to the results, which are below the fold.
+  loadRooms({ scroll: true });
 });
 
 const initial = new URLSearchParams(window.location.search);
@@ -162,6 +222,6 @@ for (const id of FIELDS) {
   if (value) document.getElementById(id).value = value;
 }
 
-initPage();
+initPage(SECTION_LINKS);
 loadProperty().catch((err) => showMessage(err.message));
 loadRooms();
