@@ -65,6 +65,11 @@ app.get('/healthz', (req, res) => {
 // splitting search rankings and leaving visitors on whichever one they happened
 // to type. Unset in development, where the app answers on localhost.
 //
+// CANONICAL_HOST must agree with the apex/www redirect Render performs at its
+// own edge (the "redirects to ..." badge under Settings -> Custom Domains).
+// Aim the two at each other and a request bounces between Render and this app
+// until the browser aborts with ERR_TOO_MANY_REDIRECTS.
+//
 // It sits below /healthz so platform probes are never redirected, and above the
 // rate limiter so a redirected visitor does not spend an allowance on a request
 // that returns no content. Protocol is left alone: Render terminates TLS and

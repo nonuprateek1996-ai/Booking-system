@@ -13,7 +13,9 @@ const os = require('os');
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'booking-canonical-'));
 process.env.NODE_ENV = 'test';
 process.env.SEED_DEMO = '0';
-process.env.CANONICAL_HOST = 'colonelsparadisebir.com';
+// Mirrors production: Render redirects the apex to www at its edge, so www is
+// the canonical name here. See render.yaml.
+process.env.CANONICAL_HOST = 'www.colonelsparadisebir.com';
 
 const app = require('../src/app');
 
@@ -39,35 +41,39 @@ function request(pathname, host, method = 'GET') {
 }
 
 test('an alias hostname is redirected to the canonical one', async () => {
-  const res = await request('/room.html?id=3', 'www.colonelsparadisebir.com');
+  const res = await request('/room.html?id=3', 'booking-system.onrender.com');
   assert.strictEqual(res.status, 308);
   assert.strictEqual(
     res.headers.get('location'),
-    'https://colonelsparadisebir.com/room.html?id=3',
+    'https://www.colonelsparadisebir.com/room.html?id=3',
     'the path and query survive the redirect'
   );
 });
 
-test('the old onrender.com URL still reaches the site', async () => {
-  const res = await request('/', 'booking-system.onrender.com');
+test('the apex is sent to www, the same direction Render redirects', async () => {
+  // Render already rewrites the apex to www at its edge, so this rarely fires.
+  // What matters is the direction: pointing this redirect back at the apex
+  // would bounce requests between Render and this app until the browser gave
+  // up with ERR_TOO_MANY_REDIRECTS.
+  const res = await request('/', 'colonelsparadisebir.com');
   assert.strictEqual(res.status, 308);
-  assert.strictEqual(res.headers.get('location'), 'https://colonelsparadisebir.com/');
+  assert.strictEqual(res.headers.get('location'), 'https://www.colonelsparadisebir.com/');
 });
 
 test('a POST keeps its method so the request can be replayed', async () => {
-  const res = await request('/api/auth/login', 'www.colonelsparadisebir.com', 'POST');
+  const res = await request('/api/auth/login', 'booking-system.onrender.com', 'POST');
   // 308 (not 301) is what tells the browser to re-send the POST as a POST.
   assert.strictEqual(res.status, 308);
 });
 
 test('requests already on the canonical host are served normally', async () => {
-  const res = await request('/healthz', 'colonelsparadisebir.com');
+  const res = await request('/healthz', 'www.colonelsparadisebir.com');
   assert.strictEqual(res.status, 200);
   assert.deepStrictEqual(await res.json(), { status: 'ok' });
 });
 
 test('a host with a port still matches the canonical name', async () => {
-  const res = await request('/healthz', 'colonelsparadisebir.com:443');
+  const res = await request('/healthz', 'www.colonelsparadisebir.com:443');
   assert.strictEqual(res.status, 200, 'the port is ignored when comparing hosts');
 });
 

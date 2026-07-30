@@ -58,6 +58,14 @@ Render polls DNS and issues a TLS certificate automatically once the records
 resolve. Both names flip to **Certificate Issued** — usually within 15 minutes,
 though registrars advertise up to 48 hours.
 
+While the page still says **Certificate Pending**, the browser cannot negotiate
+TLS at all and shows `ERR_SSL_VERSION_OR_CIPHER_MISMATCH` ("This site can't
+provide a secure connection"). That is the expected appearance of a
+not-yet-issued certificate, not a misconfiguration — it clears itself once the
+status flips. If it is still pending after an hour, the usual causes are a
+leftover `AAAA` record, a proxying CDN in front of the records, or a `CAA`
+record that does not permit `letsencrypt.org`.
+
 Check propagation from a terminal:
 
 ```bash
@@ -68,19 +76,33 @@ dig +short www.colonelsparadisebir.com
 Then confirm the site and the redirect:
 
 ```bash
-curl -sI https://colonelsparadisebir.com/          # expect HTTP/2 200
-curl -sI https://www.colonelsparadisebir.com/      # expect 308 -> https://colonelsparadisebir.com/
-curl -s  https://colonelsparadisebir.com/healthz   # expect {"status":"ok"}
+curl -sI https://www.colonelsparadisebir.com/          # expect HTTP/2 200
+curl -sI https://colonelsparadisebir.com/              # expect 301 -> https://www.colonelsparadisebir.com/
+curl -s  https://www.colonelsparadisebir.com/healthz   # expect {"status":"ok"}
+
+# Following the chain must settle, not ping-pong. More than one or two hops
+# means CANONICAL_HOST disagrees with Render's redirect direction.
+curl -sIL https://colonelsparadisebir.com/ | grep -iE '^(HTTP|location)'
 ```
 
 ## How the app handles the domain
 
-- `CANONICAL_HOST=colonelsparadisebir.com` is set in `render.yaml`. Any request
-  arriving on another name Render routes here — `www`, the old
+- `CANONICAL_HOST=www.colonelsparadisebir.com` is set in `render.yaml`. Any
+  request arriving on another name Render routes here — the apex, the old
   `booking-system.onrender.com` URL — is answered with a `308` to the same path
   on the canonical name, so the site has one address for links, bookmarks and
   search engines. Set it in Render's environment too if the service does not
   re-read the blueprint.
+- **`CANONICAL_HOST` must point the same way as Render's own apex/www redirect**,
+  shown as a `redirects to ...` badge under Settings → Custom Domains. Render is
+  currently set to send the apex to `www`, so `www` is canonical. Aim the two at
+  each other and a request bounces between Render's edge and this app until the
+  browser aborts with `ERR_TOO_MANY_REDIRECTS`.
+- To make the bare domain canonical instead: on the Custom Domains page, edit
+  the domain and use the **Redirect to** control so `www.colonelsparadisebir.com`
+  redirects to `colonelsparadisebir.com`, then change `CANONICAL_HOST` to
+  `colonelsparadisebir.com`. Change both, in either order — but do not leave
+  them disagreeing.
 - `/healthz` is deliberately exempt: Render probes the service on its internal
   hostname, and a redirect there would fail the deploy gate.
 - HTTPS is Render's job. It terminates TLS, renews the certificate, and

@@ -25,10 +25,16 @@ services:
       - key: TRUST_PROXY
         value: "1"
       # The one hostname the site answers on. Every other name Render routes
-      # here (www, the onrender.com URL) is redirected to it, so links,
+      # here (the apex, the onrender.com URL) is redirected to it, so links,
       # bookmarks and search results all settle on a single address.
+      #
+      # This MUST match the direction of Render's own apex/www redirect, shown
+      # as a "redirects to ..." badge on Settings -> Custom Domains. Render is
+      # currently set to send the apex to www, so www is canonical here. Point
+      # the two at each other and requests bounce between Render's edge and
+      # this app until the browser gives up with ERR_TOO_MANY_REDIRECTS.
       - key: CANONICAL_HOST
-        value: colonelsparadisebir.com
+        value: www.colonelsparadisebir.com
       # The owner account is provisioned from these at startup (no shell
       # needed). sync: false makes Render prompt for the values securely at
       # deploy time instead of storing them in the repository.
