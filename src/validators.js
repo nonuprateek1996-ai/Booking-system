@@ -165,6 +165,10 @@ function todayUtcMs() {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
+function todayIso() {
+  return new Date(todayUtcMs()).toISOString().slice(0, 10);
+}
+
 function nightsBetween(checkIn, checkOut) {
   return (Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86400000;
 }
@@ -241,6 +245,7 @@ module.exports = {
   isValidGuestCount,
   isValidId,
   isRealDate,
+  todayIso,
   nightsBetween,
   validateStay,
   sniffImageType,

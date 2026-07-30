@@ -17,7 +17,8 @@
     <p id="message" role="alert" hidden></p>
 
     <div class="tabs" id="tabs">
-      <button type="button" class="tab active" data-tab="requests">
+      <button type="button" class="tab active" data-tab="calendar">Calendar</button>
+      <button type="button" class="tab" data-tab="requests">
         Requests <span id="pending-badge" class="badge" hidden></span>
       </button>
       <button type="button" class="tab" data-tab="rooms">Rooms</button>
@@ -25,8 +26,39 @@
       <button type="button" class="tab" data-tab="security">Security</button>
     </div>
 
+    <!-- Room calendar: rooms down the side, nights across the top -->
+    <section id="panel-calendar" class="panel">
+      <div class="owner-head">
+        <h1>Calendar</h1>
+        <p class="hint" id="cal-summary"></p>
+      </div>
+
+      <div class="cal-controls">
+        <button type="button" id="cal-today">Today</button>
+        <button type="button" id="cal-prev" class="cal-step" aria-label="Previous window">‹</button>
+        <button type="button" id="cal-next" class="cal-step" aria-label="Next window">›</button>
+        <label class="cal-jump">Start<input type="date" id="cal-start"></label>
+        <label class="cal-jump">Show<select id="cal-span"></select></label>
+        <span class="cal-range" id="cal-range"></span>
+      </div>
+
+      <div class="cal-scroll">
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <p id="cal-empty" class="empty" hidden>No rooms yet. Add one under Rooms to see it here.</p>
+
+      <ul class="cal-legend">
+        <li><span class="swatch status-approved"></span>Confirmed</li>
+        <li><span class="swatch status-pending"></span>Pending — not yet approved</li>
+      </ul>
+      <p class="hint">
+        Only stays that hold a room are shown. Declined and cancelled requests leave the nights free,
+        so they stay in Requests rather than blocking the calendar.
+      </p>
+    </section>
+
     <!-- Booking requests -->
-    <section id="panel-requests" class="panel">
+    <section id="panel-requests" class="panel" hidden>
       <h1>Booking requests</h1>
       <p class="hint" id="transport-note"></p>
       <div id="bookings"></div>
@@ -146,6 +178,13 @@
       </div>
     </section>
   </main>
+
+  <!-- Booking details, opened by clicking a bar on the calendar. -->
+  <div id="cal-backdrop" class="cal-backdrop" hidden></div>
+  <aside id="cal-drawer" class="cal-drawer" role="dialog" aria-modal="true" aria-label="Booking details" hidden>
+    <button type="button" id="cal-drawer-close" class="cal-drawer-close" aria-label="Close booking details">×</button>
+    <div id="cal-drawer-body"></div>
+  </aside>
 
   <script type="module" src="/js/owner.js"></script>
 </body>

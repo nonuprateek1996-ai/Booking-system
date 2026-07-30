@@ -949,3 +949,204 @@ button[type="submit"]:disabled { background: #9caf98; cursor: not-allowed; }
   color: var(--body-text);
   font-size: 0.9rem;
 }
+
+/* ---------- Room calendar ---------- */
+
+.cal-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.cal-controls button { padding: 0.45rem 0.9rem; font-size: 0.9rem; }
+.cal-step { min-width: 2.4rem; font-size: 1.1rem; line-height: 1; }
+.cal-jump { display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; color: var(--body-text); }
+.cal-jump input, .cal-jump select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+}
+.cal-range { margin-left: auto; font-size: 0.9rem; color: var(--body-text); font-variant-numeric: tabular-nums; }
+
+/* The grid scrolls sideways as a unit; the room column is pinned so a name is
+   always visible next to the bar it belongs to. */
+.cal-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+.cal-grid { --cal-days: 28; --cal-col: 46px; --cal-room-col: 190px; min-width: min-content; }
+
+.cal-row {
+  display: grid;
+  grid-template-columns: var(--cal-room-col) repeat(var(--cal-days), var(--cal-col));
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+/* One row means one row: cells, the room name and the bars all share it, so a
+   bar overlays the nights it covers instead of pushing them aside. */
+.cal-row > * { grid-row: 1; }
+.cal-row:last-child { border-bottom: 0; }
+
+.cal-room-head, .cal-room-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  border-right: 1px solid var(--line);
+  padding: 0.55rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+}
+.cal-room-head { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--body-text); }
+.cal-room-name strong { font-size: 0.92rem; }
+.cal-room-name .hint { font-size: 0.76rem; }
+.cal-room-name .badge { align-self: flex-start; margin-top: 0.15rem; }
+
+.cal-head-row { background: #fff; }
+.cal-day-head {
+  padding: 0.4rem 0 0.5rem;
+  text-align: center;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.25;
+}
+.cal-month { font-size: 0.68rem; font-weight: 600; color: var(--heading); text-transform: uppercase; min-height: 1em; }
+.cal-weekday { font-size: 0.68rem; color: var(--body-text); text-transform: uppercase; }
+.cal-daynum { font-size: 0.88rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.cal-cell { border-left: 1px solid var(--line); min-height: 46px; }
+.cal-cell.weekend, .cal-day-head.weekend { background: #f2f5f0; }
+.cal-cell.today, .cal-day-head.today { background: #eaf2ec; box-shadow: inset 1px 0 0 var(--accent), inset -1px 0 0 var(--accent); }
+.cal-day-head.today .cal-daynum { color: var(--heading); }
+.cal-day-head.month-start, .cal-cell.month-start { border-left-color: var(--accent); }
+
+/* Bars sit in the same grid track as the cells, one row up in the stack. A
+   stay can never overlap another in the same room, so no row splitting is
+   needed — the reservation endpoint rejects a clash before it is stored. */
+.cal-bar {
+  grid-row: 1;
+  align-self: center;
+  margin: 0 2px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  color: #fff;
+  background: var(--cta);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  z-index: 1;
+}
+.cal-bar:hover { filter: brightness(1.08); }
+.cal-bar:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cal-bar.selected { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cal-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.cal-bar-meta { flex: 0 0 auto; opacity: 0.85; font-variant-numeric: tabular-nums; }
+
+.cal-bar.status-approved { background: #2f6b45; }
+/* Pending is deliberately the lighter, warmer fill: it reads as "not settled
+   yet" next to the solid green of a confirmed stay. */
+.cal-bar.status-pending { background: #c98a2b; }
+
+/* A stay running past the window edge loses its rounding there, so it reads as
+   continuing rather than ending on the day the window happens to stop. */
+.cal-bar.clipped-start { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
+.cal-bar.clipped-end { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
+
+.cal-legend {
+  list-style: none;
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0.9rem 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--body-text);
+}
+.cal-legend li { display: flex; align-items: center; gap: 0.45rem; }
+.cal-legend .swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.cal-legend .swatch.status-approved { background: #2f6b45; }
+.cal-legend .swatch.status-pending { background: #c98a2b; }
+
+/* ---------- Booking detail drawer ---------- */
+
+/* Above .site-header's z-index: 30, or the header would cover the drawer's
+   own heading and close button. */
+.cal-backdrop { position: fixed; inset: 0; background: rgba(31, 42, 29, 0.35); z-index: 40; }
+.cal-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(400px, 100%);
+  background: #fff;
+  border-left: 1px solid var(--line);
+  box-shadow: -8px 0 28px rgba(31, 42, 29, 0.14);
+  padding: 1.5rem;
+  overflow-y: auto;
+  z-index: 41;
+}
+.cal-drawer-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.9rem;
+  background: none;
+  border: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--body-text);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+.cal-drawer-close:hover { color: var(--ink); }
+.cal-drawer-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0 2rem 1rem 0; }
+.cal-drawer-head h2 { margin: 0; font-size: 1.15rem; }
+
+.cal-details { margin: 0 0 1.1rem; }
+.cal-detail-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.cal-detail-row dt { color: var(--body-text); }
+.cal-detail-row dd { margin: 0; }
+
+.cal-note { margin-bottom: 1rem; }
+.cal-note h3 { margin: 0 0 0.25rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--body-text); }
+.cal-note p { margin: 0; font-size: 0.92rem; }
+
+.cal-drawer-actions { border-top: 1px solid var(--line); padding-top: 1rem; }
+.cal-drawer-actions input[type='text'] {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  margin-bottom: 0.7rem;
+}
+
+@media (max-width: 640px) {
+  .cal-grid { --cal-room-col: 130px; --cal-col: 40px; }
+  .cal-range { margin-left: 0; width: 100%; }
+}
