@@ -59,6 +59,34 @@ app.get('/healthz', (req, res) => {
   }
 });
 
+// Custom domain: send every alias to the one canonical hostname. Render routes
+// several names to this service (the apex, www, and the permanent
+// *.onrender.com URL), and without this they would each serve the whole site —
+// splitting search rankings and leaving visitors on whichever one they happened
+// to type. Unset in development, where the app answers on localhost.
+//
+// It sits below /healthz so platform probes are never redirected, and above the
+// rate limiter so a redirected visitor does not spend an allowance on a request
+// that returns no content. Protocol is left alone: Render terminates TLS and
+// already forces HTTPS, and second-guessing that from behind the proxy risks a
+// redirect loop.
+const CANONICAL_HOST = (process.env.CANONICAL_HOST || '').trim().toLowerCase();
+if (CANONICAL_HOST) {
+  app.use((req, res, next) => {
+    // Strip any port before comparing: the Host header carries one when the
+    // service is reached on a non-standard port, the configured name never does.
+    const host = (req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
+    if (!host || host === CANONICAL_HOST) return next();
+    // Only origin-form targets are rewritten. An absolute-form request line
+    // ("GET http://elsewhere/") would otherwise be pasted onto the canonical
+    // name and produce a nonsense Location header.
+    const target = req.originalUrl.startsWith('/') ? req.originalUrl : '/';
+    // 308 rather than 301: it preserves the method and body, so a form post
+    // that lands on an alias still completes instead of silently becoming a GET.
+    res.redirect(308, `https://${CANONICAL_HOST}${target}`);
+  });
+}
+
 // Global rate limit; credential endpoints have their own tighter limit.
 app.use(
   rateLimit({

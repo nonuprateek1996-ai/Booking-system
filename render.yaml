@@ -9,6 +9,12 @@ services:
     # deploy gate. If this service was created with an older blueprint, update
     # Settings -> Health Check Path by hand: Render does not always re-sync it.
     healthCheckPath: /healthz
+    # Custom domain. Render provisions and renews the TLS certificate for both
+    # names once the DNS records in docs/custom-domain.md resolve. The
+    # onrender.com hostname keeps working alongside them.
+    domains:
+      - colonelsparadisebir.com
+      - www.colonelsparadisebir.com
     envVars:
       - key: NODE_VERSION
         value: 22.22.2
@@ -18,6 +24,11 @@ services:
         value: 0.0.0.0
       - key: TRUST_PROXY
         value: "1"
+      # The one hostname the site answers on. Every other name Render routes
+      # here (www, the onrender.com URL) is redirected to it, so links,
+      # bookmarks and search results all settle on a single address.
+      - key: CANONICAL_HOST
+        value: colonelsparadisebir.com
       # The owner account is provisioned from these at startup (no shell
       # needed). sync: false makes Render prompt for the values securely at
       # deploy time instead of storing them in the repository.
