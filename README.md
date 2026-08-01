@@ -74,6 +74,8 @@ Transports activate purely from environment variables:
 | WhatsApp | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus `WHATSAPP_TEMPLATE_NAME` |
 | Override recipients | `NOTIFY_EMAIL`, `NOTIFY_PHONE` (default to the property's contact details) |
 
+Setting WhatsApp up from a fresh Meta Business account — app, phone number ID, a non-expiring System User token, and the template — is walked through in [docs/whatsapp-alerts.md](docs/whatsapp-alerts.md).
+
 A booking alert is business-initiated, so Meta requires an **approved message template** to reach you outside a 24-hour reply window — set `WHATSAPP_TEMPLATE_NAME` to a Utility template whose body has five placeholders, in this order: guest name, room, check-in, check-out, total. Without a template the code falls back to plain text, which only lands inside that window. The guest is emailed when their request is approved or declined.
 
 ## API
