@@ -2,9 +2,23 @@ services:
   - type: web
     name: booking-system
     runtime: node
-    plan: free
+    # Starter rather than free for one reason: only paid instances may attach a
+    # disk, and without a disk every restart takes the database with it.
+    plan: starter
     buildCommand: npm ci
     startCommand: npm start
+    # The database and every uploaded photo live here. A disk survives deploys,
+    # restarts and instance replacement — unlike the container filesystem, which
+    # is rebuilt from the image each time and keeps nothing written at runtime.
+    #
+    # A disk attaches to exactly one instance, so deploys briefly stop the old
+    # instance before starting the new one instead of overlapping them. For a
+    # single-owner guesthouse site that is a few seconds, and the alternative is
+    # losing the data.
+    disk:
+      name: booking-data
+      mountPath: /data
+      sizeGB: 1
     # A dedicated endpoint, so renaming a product route can never break the
     # deploy gate. If this service was created with an older blueprint, update
     # Settings -> Health Check Path by hand: Render does not always re-sync it.
@@ -42,8 +56,10 @@ services:
         sync: false
       - key: OWNER_PASSWORD
         sync: false
-      # Note: on the free plan the filesystem is ephemeral, so the SQLite
-      # database resets on each deploy/restart (the owner account is
-      # recreated automatically from the variables above). Attach a
-      # persistent disk (paid plans) mounted at /data and set DATA_DIR=/data
-      # to keep rooms, photos and bookings permanently.
+      # Points the database at the disk above. Without this the app falls back
+      # to <repo>/data (src/db.js), which is on the container filesystem and is
+      # thrown away on every deploy and restart — the disk would be mounted and
+      # sit there empty. Paying for a disk and leaving this unset loses data
+      # exactly as if there were no disk at all.
+      - key: DATA_DIR
+        value: /data
