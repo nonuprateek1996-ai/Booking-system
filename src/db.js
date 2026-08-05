@@ -16,19 +16,63 @@ db.pragma('foreign_keys = ON');
 //   v1  hourly meeting-room slots
 //   v2  multi-property rental marketplace
 //   v3  a single guesthouse whose individual rooms are the bookable unit
-// Each step replaced the booking model outright, so the older tables are
-// dropped rather than migrated — they only ever held demo seed data.
+// v1 and v2 replaced the booking model outright and predate any real
+// deployment, so there is no migration path from them — their tables are
+// dropped, but only after proving they hold nothing (see below).
 const SCHEMA_VERSION = 3;
+
+// The versions whose tables may be discarded, and the tables that discarding
+// them removes. Adding a version here is a decision to destroy data, so it is
+// deliberately a list rather than a `<` comparison.
+const DISCARDABLE_VERSIONS = new Set([1, 2]);
+const LEGACY_TABLES = ['bookings', 'property_images', 'rooms', 'properties', 'resources'];
+
 const currentVersion = db.pragma('user_version', { simple: true });
 
+function rowsInLegacyTables() {
+  const present = new Set(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((r) => r.name)
+  );
+  const counts = [];
+  for (const table of LEGACY_TABLES) {
+    if (!present.has(table)) continue;
+    const n = db.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get().n;
+    if (n > 0) counts.push(`${table}: ${n}`);
+  }
+  return counts;
+}
+
+// A database written by a newer build than this one. Its shape is unknown, so
+// running against it risks writing rows the newer code cannot read. Stopping
+// is the only safe move — this is what a rolled-back deploy looks like.
+if (currentVersion > SCHEMA_VERSION) {
+  throw new Error(
+    `Database schema v${currentVersion} is newer than this build (v${SCHEMA_VERSION}). ` +
+      'Deploy the matching version, or restore a backup taken before the upgrade.'
+  );
+}
+
 if (currentVersion > 0 && currentVersion < SCHEMA_VERSION) {
-  db.exec(`
-    DROP TABLE IF EXISTS bookings;
-    DROP TABLE IF EXISTS property_images;
-    DROP TABLE IF EXISTS rooms;
-    DROP TABLE IF EXISTS properties;
-    DROP TABLE IF EXISTS resources;
-  `);
+  if (!DISCARDABLE_VERSIONS.has(currentVersion)) {
+    throw new Error(
+      `No migration exists from schema v${currentVersion} to v${SCHEMA_VERSION}. ` +
+        'Write one before deploying: this build will not start rather than guess.'
+    );
+  }
+
+  // The legacy drop was written when the database only ever held seed data.
+  // It cannot tell demo rows from a real guest's booking, so it no longer
+  // guesses: anything present stops the deploy instead of being deleted.
+  const occupied = rowsInLegacyTables();
+  if (occupied.length > 0 && process.env.ALLOW_DESTRUCTIVE_MIGRATION !== '1') {
+    throw new Error(
+      `Refusing to upgrade schema v${currentVersion} -> v${SCHEMA_VERSION}: it would drop tables ` +
+        `that still hold data (${occupied.join(', ')}). Back the database up first, then set ` +
+        'ALLOW_DESTRUCTIVE_MIGRATION=1 to confirm the loss is intended.'
+    );
+  }
+
+  db.exec(LEGACY_TABLES.map((t) => `DROP TABLE IF EXISTS ${t};`).join('\n'));
 }
 
 db.exec(`

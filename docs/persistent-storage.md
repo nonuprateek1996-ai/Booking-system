@@ -83,3 +83,31 @@ If `booking.db` is somewhere else, `DATA_DIR` is not pointing at the mount.
   accidental delete. `sqlite3 /data/booking.db ".backup /tmp/backup.db"` from the
   Render shell, downloaded periodically, is worth doing before real bookings
   start arriving.
+
+## The schema guard
+
+`src/db.js` tracks a schema version in the database file and compares it with
+the version the running build expects. When they differ it stops the deploy
+rather than altering the data, because a mismatch means the code and the stored
+rows disagree about what the data *is*.
+
+Three situations, all of which end in a failed deploy and an untouched database
+— Render keeps the previous version serving:
+
+| Message | Meaning | What to do |
+| --- | --- | --- |
+| `No migration exists from schema vN to vM` | Someone raised `SCHEMA_VERSION` without writing the migration to go with it | Write the migration, or put the version back |
+| `Database schema vN is newer than this build` | A rolled-back deploy: the disk still carries the newer schema | Redeploy the newer build, or restore a backup from before the upgrade |
+| `Refusing to upgrade schema v1/v2 -> v3: it would drop tables that still hold data` | A pre-release database that still has rows in it | Back it up, then set `ALLOW_DESTRUCTIVE_MIGRATION=1` to confirm the loss |
+
+`ALLOW_DESTRUCTIVE_MIGRATION=1` applies only to the third case and exists so the
+answer to a blocked deploy is never "edit the guard out". Set it, deploy once,
+then remove it — leaving it on re-arms the original hazard.
+
+### Adding a column later
+
+Raising `SCHEMA_VERSION` is only for changes that reshape existing data. Adding
+a column does not need it: `addColumnIfMissing()` further down `src/db.js`
+already adds columns in place on every start, and `CREATE TABLE IF NOT EXISTS`
+covers new tables. A room-closure feature, for instance, would be a new table
+plus a couple of columns — no version bump, no migration, nothing at risk.
