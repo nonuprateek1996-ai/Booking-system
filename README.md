@@ -73,6 +73,7 @@ Transports activate purely from environment variables:
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
 | WhatsApp | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus `WHATSAPP_TEMPLATE_NAME` |
 | Override recipients | `NOTIFY_EMAIL`, `NOTIFY_PHONE` (default to the property's contact details) |
+| Google sign-in (guests) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, optionally `GOOGLE_REDIRECT_URI` — see [docs/google-sign-in.md](docs/google-sign-in.md) |
 
 Setting WhatsApp up from a fresh Meta Business account — app, phone number ID, a non-expiring System User token, and the template — is walked through in [docs/whatsapp-alerts.md](docs/whatsapp-alerts.md).
 
@@ -120,6 +121,7 @@ Every item below is covered by a regression test.
 The owner account controls the whole guesthouse, so it is hardened well past the guest accounts:
 
 - **No self-registration.** Registration always produces a guest, whatever the request body claims. The owner exists only via `npm run create-owner` or the server's own environment variables at startup, so no network path can mint one.
+- **No Google sign-in.** [Guests may sign in with Google](docs/google-sign-in.md); the owner may not. The callback refuses any account that is not a guest, so controlling the owner's Gmail never substitutes for the password, the second factor and the lockout — and the refusal is worded like every other, so it cannot be used to find out which address is the owner's.
 - **Two-factor authentication (TOTP)** compatible with any authenticator app, implemented on Node's own crypto — it adds no third-party dependency to the supply chain. Codes are compared in constant time, accepted within one 30-second step either side for clock drift, and **cannot be replayed**: the consumed step is recorded, so a code observed over the shoulder or in a log is dead inside its own window.
 - **Single-use recovery codes** (8, shown once, stored only as bcrypt hashes) so a lost phone cannot lock the owner out permanently.
 - **Disabling two-factor requires the password**, so a stolen session alone cannot strip the second factor. Enabling it revokes all other sessions.

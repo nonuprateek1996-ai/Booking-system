@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const totp = require('../totp');
 const auth = require('../auth');
+const googleOAuth = require('../google-oauth');
 const v = require('../validators');
 
 const router = express.Router();
@@ -186,6 +187,169 @@ router.post('/login', authLimiter, async (req, res, next) => {
     auth.createSession(req, res, user);
     auth.recordLoginAttempt(req, { userId: user.id, email: normalized, outcome: 'success' });
     return res.json({ user: publicUser(user) });
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// --- Google sign-in (guests only) ---
+
+// Holds the CSRF state and the PKCE verifier between the redirect out to Google
+// and the callback back. SameSite must be Lax, not Strict: the callback is a
+// top-level navigation from accounts.google.com, and a Strict cookie is not
+// sent on a cross-site navigation — the flow would fail every time. Lax is the
+// weakest setting that works here and still blocks cross-site POSTs.
+const GOOGLE_FLOW_COOKIE = 'g_oauth';
+const GOOGLE_FLOW_MS = 10 * 60 * 1000;
+
+function googleFlowCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: GOOGLE_FLOW_MS,
+    path: '/api/auth',
+  };
+}
+
+// Only same-origin paths survive, so a crafted ?next= cannot bounce a
+// freshly signed-in guest to someone else's site.
+function safeNext(value, fallback = '/bookings.html') {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
+    ? value
+    : fallback;
+}
+
+function backToLogin(res, reason) {
+  return res.redirect(`/login.html?error=${encodeURIComponent(reason)}`);
+}
+
+// Lets the sign-in page show the Google button only when Google is actually
+// wired up, rather than offering a button that dead-ends in a 404.
+router.get('/providers', (req, res) => {
+  res.json({ google: googleOAuth.isConfigured() });
+});
+
+router.get('/google', authLimiter, (req, res) => {
+  if (!googleOAuth.isConfigured()) {
+    return res.status(404).json({ error: 'Google sign-in is not enabled' });
+  }
+  const state = crypto.randomBytes(32).toString('base64url');
+  const { verifier, challenge } = googleOAuth.createPkce();
+
+  res.cookie(
+    GOOGLE_FLOW_COOKIE,
+    Buffer.from(JSON.stringify({ state, verifier, next: safeNext(req.query.next) })).toString('base64url'),
+    googleFlowCookieOptions()
+  );
+  return res.redirect(googleOAuth.authorizationUrl({ req, state, challenge }));
+});
+
+router.get('/google/callback', authLimiter, async (req, res, next) => {
+  if (!googleOAuth.isConfigured()) {
+    return res.status(404).json({ error: 'Google sign-in is not enabled' });
+  }
+
+  // Single-use: cleared before anything can fail, so a replayed callback has no
+  // state to match against.
+  const raw = req.cookies[GOOGLE_FLOW_COOKIE];
+  res.clearCookie(GOOGLE_FLOW_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/api/auth' });
+
+  try {
+    // The guest pressed Cancel on Google's consent screen.
+    if (req.query.error) {
+      return backToLogin(res, 'Google sign-in was cancelled');
+    }
+
+    let flow;
+    try {
+      flow = JSON.parse(Buffer.from(String(raw ?? ''), 'base64url').toString('utf8'));
+    } catch {
+      flow = null;
+    }
+    if (!flow || typeof flow.state !== 'string' || typeof flow.verifier !== 'string') {
+      return backToLogin(res, 'Your sign-in took too long — please try again');
+    }
+    // Constant-time, and length-checked first because timingSafeEqual throws on
+    // a length mismatch.
+    const supplied = Buffer.from(String(req.query.state ?? ''));
+    const expected = Buffer.from(flow.state);
+    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+      auth.recordLoginAttempt(req, { email: '', outcome: 'google_bad_state' });
+      return backToLogin(res, 'Sign-in could not be verified — please try again');
+    }
+    if (typeof req.query.code !== 'string' || req.query.code === '') {
+      return backToLogin(res, 'Google sign-in did not complete');
+    }
+
+    let profile;
+    try {
+      const idToken = await googleOAuth.exchangeCode({ req, code: req.query.code, verifier: flow.verifier });
+      profile = googleOAuth.readIdToken(idToken);
+    } catch (err) {
+      console.error('Google sign-in failed:', err.message);
+      auth.recordLoginAttempt(req, { email: '', outcome: 'google_rejected' });
+      return backToLogin(res, 'Google sign-in failed — please try again or use a password');
+    }
+
+    const normalized = v.normalizeEmail(profile.email);
+    // Matched on the Google subject first: it survives the guest changing the
+    // address on their Google account, which the email never would.
+    let user =
+      db.prepare('SELECT * FROM users WHERE google_sub = ?').get(profile.sub) ??
+      db.prepare('SELECT * FROM users WHERE email = ?').get(normalized);
+
+    if (user) {
+      // The owner account is reachable only by password plus its second factor.
+      // Without this, anyone who controls that Google address would inherit the
+      // dashboard — no password, no 2FA, nothing to brute-force. Reported the
+      // same way as any other refusal so the response cannot be used to
+      // discover which address is the owner's.
+      if (user.role !== 'guest') {
+        auth.recordLoginAttempt(req, {
+          userId: user.id,
+          email: normalized,
+          outcome: 'google_wrong_portal',
+        });
+        return backToLogin(res, 'That account cannot use Google sign-in');
+      }
+
+      const remaining = auth.lockRemainingMs(user);
+      if (remaining > 0) {
+        auth.recordLoginAttempt(req, { userId: user.id, email: normalized, outcome: 'locked' });
+        return backToLogin(res, `Too many failed attempts. Try again in ${Math.ceil(remaining / 60000)} minute(s).`);
+      }
+
+      // First Google sign-in for an account that registered with a password.
+      // Safe only because the address is verified above; the password keeps
+      // working, so this adds a way in rather than replacing one.
+      if (!user.google_sub) {
+        db.prepare('UPDATE users SET google_sub = ? WHERE id = ?').run(profile.sub, user.id);
+      }
+    } else {
+      // No password is ever usable on an account created this way: the stored
+      // hash is of a random secret that is discarded immediately.
+      const unusable = await bcrypt.hash(crypto.randomBytes(32).toString('base64url'), BCRYPT_ROUNDS);
+      const name = profile.name !== '' ? profile.name.slice(0, 100) : normalized.split('@')[0].slice(0, 100);
+      const result = db
+        .prepare(
+          "INSERT INTO users (email, name, phone, password_hash, role, google_sub) VALUES (?, ?, '', ?, 'guest', ?)"
+        )
+        .run(normalized, name, unusable, profile.sub);
+      user = { id: result.lastInsertRowid, email: normalized, name, role: 'guest' };
+      auth.recordLoginAttempt(req, { userId: user.id, email: normalized, outcome: 'google_register' });
+    }
+
+    auth.clearFailedAttempts(user.id);
+    auth.createSession(req, res, user);
+    auth.recordLoginAttempt(req, { userId: user.id, email: normalized, outcome: 'google_success' });
+
+    // Via a static page rather than straight to the destination. The session
+    // cookie is SameSite=Strict, and this response is the tail of a cross-site
+    // navigation from Google; browsers may withhold a Strict cookie on the very
+    // next hop, landing the guest on a page that thinks they are signed out.
+    // A same-origin page navigating onward is unambiguously same-site.
+    return res.redirect(`/auth-complete.html?next=${encodeURIComponent(safeNext(flow.next))}`);
   } catch (err) {
     return next(err);
   }

@@ -83,6 +83,10 @@ db.exec(`
     phone         TEXT    NOT NULL DEFAULT '',
     password_hash TEXT    NOT NULL,
     role          TEXT    NOT NULL DEFAULT 'guest' CHECK (role IN ('guest', 'owner', 'admin')),
+    -- Google's subject identifier, when the guest signed in with Google. Stable
+    -- across email changes, which is why the link is keyed on it rather than on
+    -- the address.
+    google_sub    TEXT    NULL,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -222,6 +226,14 @@ addColumnIfMissing('sessions', 'absolute_expires_at', 'INTEGER NOT NULL DEFAULT 
 addColumnIfMissing('sessions', 'last_seen_at', 'INTEGER NOT NULL DEFAULT 0');
 addColumnIfMissing('sessions', 'ip', "TEXT NOT NULL DEFAULT ''");
 addColumnIfMissing('sessions', 'user_agent', "TEXT NOT NULL DEFAULT ''");
+addColumnIfMissing('users', 'google_sub', 'TEXT NULL');
+
+// Partial, so the many password-only accounts (all NULL here) do not collide
+// with each other while one Google identity still maps to at most one account.
+// Created after the column is added, since older databases lack it.
+db.exec(
+  'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL'
+);
 
 db.pragma(`user_version = ${SCHEMA_VERSION}`);
 

@@ -43,6 +43,12 @@
 
 * { box-sizing: border-box; }
 
+/* The browser's own [hidden] rule is only a user-agent rule, so any author rule
+   that sets `display` beats it — `label { display: block }` below was quietly
+   overriding it, leaving `<label hidden>` fields on screen. An author-level
+   attribute selector outranks an element selector, so this restores it. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -1149,4 +1155,41 @@ button[type="submit"]:disabled { background: #9caf98; cursor: not-allowed; }
 @media (max-width: 640px) {
   .cal-grid { --cal-room-col: 130px; --cal-col: 40px; }
   .cal-range { margin-left: 0; width: 100%; }
+}
+
+/* ---------- Google sign-in ---------- */
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+.google-btn:hover { background: #f7f9f6; border-color: #cbd5c7; }
+.google-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+/* The mark is Google's, so it keeps its own colours in every theme. */
+.google-mark { flex: 0 0 auto; }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.1rem 0;
+  color: var(--body-text);
+  font-size: 0.85rem;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
 }
