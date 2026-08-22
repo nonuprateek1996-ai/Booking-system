@@ -3,23 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My trips — Staylist</title>
+  <title>Signing you in — Staylist</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="/">Staylist</a>
-    <nav class="nav-actions" id="nav"></nav>
   </header>
 
-  <main>
-    <p id="message" role="alert" hidden></p>
-    <h1>My trips</h1>
-    <div id="list" class="trip-list"></div>
-    <p id="empty" class="empty" hidden>You have no bookings yet. <a href="/">Find a place to stay</a>.</p>
+  <main class="narrow">
+    <div class="card">
+      <h1>Signing you in…</h1>
+      <p class="hint">One moment. <a id="fallback" href="/bookings.html">Continue</a> if this does not move on by itself.</p>
+    </div>
   </main>
 
-  <script type="module" src="/js/bookings.js"></script>
+  <script type="module" src="/js/auth-complete.js"></script>
 </body>
 </html>

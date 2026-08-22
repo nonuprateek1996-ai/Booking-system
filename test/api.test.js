@@ -513,6 +513,7 @@ test('guests cannot reach any owner endpoint', async () => {
     ['POST', '/api/owner/rooms', { name: 'X', pricePerNight: 1, maxGuests: 1 }],
     ['PATCH', '/api/owner/property', { name: 'Hacked' }],
     ['GET', '/api/owner/bookings', undefined],
+    ['GET', '/api/owner/calendar', undefined],
     ['GET', '/api/owner/notifications', undefined],
   ]) {
     const r = await guest(method, path, body);
@@ -694,6 +695,92 @@ test('declining releases the dates for someone else', async () => {
     checkOut: dateIn(52),
   });
   assert.strictEqual(clash.status, 201);
+});
+
+// --- The room calendar ---
+
+test('the calendar returns the rooms and the stays that overlap the window', async () => {
+  const owner = await ownerClient();
+  const id = await makeRoom(owner, { name: 'Calendar Room' });
+  const guest = await makeGuest('calendar-guest@example.com');
+
+  const created = await guest('POST', '/api/bookings', {
+    roomId: id,
+    checkIn: dateIn(100),
+    checkOut: dateIn(103),
+    note: 'Late arrival',
+  });
+  assert.strictEqual(created.status, 201);
+  const bookingId = created.data.booking.id;
+
+  const r = await owner('GET', `/api/owner/calendar?start=${dateIn(99)}&days=7`);
+  assert.strictEqual(r.status, 200);
+  assert.ok(r.data.rooms.some((room) => room.id === id), 'every room gets a row, booked or not');
+
+  const stay = r.data.bookings.find((b) => b.id === bookingId);
+  assert.ok(stay, 'the overlapping stay is returned');
+  // The drawer renders straight from this payload, so the guest's details must
+  // travel with the stay rather than needing a second lookup per bar.
+  assert.strictEqual(stay.guestName, 'Guest');
+  assert.strictEqual(stay.guestEmail, 'calendar-guest@example.com');
+  assert.strictEqual(stay.guestNote, 'Late arrival');
+  assert.strictEqual(stay.roomId, id);
+});
+
+test('the calendar window excludes stays that do not touch it', async () => {
+  const owner = await ownerClient();
+  const id = await makeRoom(owner, { name: 'Window Room' });
+  const guest = await makeGuest('window-guest@example.com');
+
+  const created = await guest('POST', '/api/bookings', {
+    roomId: id,
+    checkIn: dateIn(200),
+    checkOut: dateIn(203),
+  });
+  const bookingId = created.data.booking.id;
+
+  const inside = await owner('GET', `/api/owner/calendar?start=${dateIn(198)}&days=7`);
+  assert.ok(inside.data.bookings.some((b) => b.id === bookingId));
+
+  const before = await owner('GET', `/api/owner/calendar?start=${dateIn(180)}&days=7`);
+  assert.ok(!before.data.bookings.some((b) => b.id === bookingId), 'a window ending before the stay is empty');
+
+  // Half-open at the edges: a window ending exactly on check-in contains none
+  // of the stay's nights, so the bar must not appear.
+  const abutting = await owner('GET', `/api/owner/calendar?start=${dateIn(197)}&days=3`);
+  assert.ok(!abutting.data.bookings.some((b) => b.id === bookingId), 'the day of check-in is not a night stayed');
+});
+
+test('declined stays leave the calendar so the nights read as free', async () => {
+  const owner = await ownerClient();
+  const id = await makeRoom(owner, { name: 'Freed Room' });
+  const guest = await makeGuest('freed-guest@example.com');
+
+  const created = await guest('POST', '/api/bookings', {
+    roomId: id,
+    checkIn: dateIn(150),
+    checkOut: dateIn(152),
+  });
+  const bookingId = created.data.booking.id;
+
+  const held = await owner('GET', `/api/owner/calendar?start=${dateIn(149)}&days=7`);
+  assert.ok(held.data.bookings.some((b) => b.id === bookingId), 'a pending request still holds the room');
+
+  await owner('POST', `/api/owner/bookings/${bookingId}/decline`, {});
+
+  const freed = await owner('GET', `/api/owner/calendar?start=${dateIn(149)}&days=7`);
+  assert.ok(
+    !freed.data.bookings.some((b) => b.id === bookingId),
+    'a declined request must not paint a room as occupied'
+  );
+});
+
+test('the calendar rejects a nonsense window', async () => {
+  const owner = await ownerClient();
+  for (const query of ['?start=not-a-date', '?start=2026-02-31', '?days=0', '?days=91', '?days=abc']) {
+    const r = await owner('GET', `/api/owner/calendar${query}`);
+    assert.strictEqual(r.status, 400, query);
+  }
 });
 
 test('a request can only be decided once', async () => {

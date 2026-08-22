@@ -1,6 +1,7 @@
 'use strict';
 
 import { api, el, money, formatDate, showMessage, initPage } from './common.js';
+import { initCalendar, loadCalendar } from './calendar.js';
 
 const STATUS_LABEL = {
   pending: 'Pending',
@@ -21,6 +22,9 @@ document.getElementById('tabs').addEventListener('click', (e) => {
     panel.hidden = panel.id !== `panel-${tab.dataset.tab}`;
   }
   showMessage('');
+  // The calendar measures its own columns, which it cannot do while hidden,
+  // so it is redrawn each time the tab comes back into view.
+  if (tab.dataset.tab === 'calendar') loadCalendar();
 });
 
 // --- Booking requests ---
@@ -33,6 +37,8 @@ function bookingCard(b, reload) {
       await api(`/api/owner/bookings/${b.id}/${action}`, { method: 'POST', body: { note: noteInput.value } });
       showMessage(action === 'approve' ? 'Booking confirmed — the guest has been emailed.' : 'Request declined.', 'success');
       reload();
+      // A decision changes which nights are held, so the calendar is stale now.
+      loadCalendar();
     } catch (err) {
       showMessage(err.message);
     }
@@ -502,6 +508,8 @@ initPage().then((user) => {
     window.location.replace('/bookings.html');
     return;
   }
+  initCalendar({ onDecision: loadBookings });
+  loadCalendar();
   loadBookings();
   loadRooms();
   loadProperty();

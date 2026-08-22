@@ -73,6 +73,9 @@ Transports activate purely from environment variables:
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` |
 | WhatsApp | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, plus `WHATSAPP_TEMPLATE_NAME` |
 | Override recipients | `NOTIFY_EMAIL`, `NOTIFY_PHONE` (default to the property's contact details) |
+| Google sign-in (guests) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, optionally `GOOGLE_REDIRECT_URI` — see [docs/google-sign-in.md](docs/google-sign-in.md) |
+
+Setting WhatsApp up from a fresh Meta Business account — app, phone number ID, a non-expiring System User token, and the template — is walked through in [docs/whatsapp-alerts.md](docs/whatsapp-alerts.md).
 
 A booking alert is business-initiated, so Meta requires an **approved message template** to reach you outside a 24-hour reply window — set `WHATSAPP_TEMPLATE_NAME` to a Utility template whose body has five placeholders, in this order: guest name, room, check-in, check-out, total. Without a template the code falls back to plain text, which only lands inside that window. The guest is emailed when their request is approved or declined.
 
@@ -118,6 +121,7 @@ Every item below is covered by a regression test.
 The owner account controls the whole guesthouse, so it is hardened well past the guest accounts:
 
 - **No self-registration.** Registration always produces a guest, whatever the request body claims. The owner exists only via `npm run create-owner` or the server's own environment variables at startup, so no network path can mint one.
+- **No Google sign-in.** [Guests may sign in with Google](docs/google-sign-in.md); the owner may not. The callback refuses any account that is not a guest, so controlling the owner's Gmail never substitutes for the password, the second factor and the lockout — and the refusal is worded like every other, so it cannot be used to find out which address is the owner's.
 - **Two-factor authentication (TOTP)** compatible with any authenticator app, implemented on Node's own crypto — it adds no third-party dependency to the supply chain. Codes are compared in constant time, accepted within one 30-second step either side for clock drift, and **cannot be replayed**: the consumed step is recorded, so a code observed over the shoulder or in a log is dead inside its own window.
 - **Single-use recovery codes** (8, shown once, stored only as bcrypt hashes) so a lost phone cannot lock the owner out permanently.
 - **Disabling two-factor requires the password**, so a stolen session alone cannot strip the second factor. Enabling it revokes all other sessions.
@@ -155,7 +159,11 @@ For production, run behind TLS (the `Secure` and `__Host-` cookie behaviour acti
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/nonuprateek1996-ai/Booking-system)
 
-**Render (one click, free):** the button reads `render.yaml` and deploys automatically. The blueprint prompts for `OWNER_EMAIL` and `OWNER_PASSWORD` at deploy time (they're marked `sync: false`, so they are never stored in the repository), and the owner account is provisioned from them at startup — no shell access needed. On the free plan the SQLite file is ephemeral — rooms, photos, bookings and 2FA enrolment reset on redeploy, and the owner account is recreated automatically from those variables. Attach a persistent disk mounted at `/data` and set `DATA_DIR=/data` (paid plans) to keep data permanently.
+**Render (one click):** the button reads `render.yaml` and deploys automatically. The blueprint prompts for `OWNER_EMAIL` and `OWNER_PASSWORD` at deploy time (they're marked `sync: false`, so they are never stored in the repository), and the owner account is provisioned from them at startup — no shell access needed.
+
+The blueprint runs on the Starter instance type with a 1 GB disk mounted at `/data` and `DATA_DIR=/data`, because rooms, photos, bookings and 2FA enrolment all live in one SQLite file and Render's container filesystem keeps nothing written at runtime. **Both halves are required**: a paid plan alone still loses data if no disk is attached, and an attached disk still loses data if `DATA_DIR` does not point at its mount path — the app falls back to `<repo>/data` (`src/db.js`), writing to the container instead of the disk. On the free instance type a disk cannot be attached at all, so data resets on every deploy, restart and idle spin-down. Setting this up on a service that already exists, and checking it actually took, is covered in [docs/persistent-storage.md](docs/persistent-storage.md).
+
+**Custom domain:** the blueprint claims `colonelsparadisebir.com` and `www.colonelsparadisebir.com`, and sets `CANONICAL_HOST` so every other name Render routes to the service — the apex, the old `.onrender.com` URL — redirects to `www.colonelsparadisebir.com` with a `308`. Render issues and renews the TLS certificate once DNS resolves. `CANONICAL_HOST` must point the same way as Render's own apex/www redirect or requests loop between the two; the registrar-side records, that constraint and the verification steps are in [docs/custom-domain.md](docs/custom-domain.md). Leaving `CANONICAL_HOST` unset disables the redirect, which is how local development runs on `localhost`.
 
 **Any Docker host** (Railway, Fly.io, a VPS) — a production `Dockerfile` is included:
 

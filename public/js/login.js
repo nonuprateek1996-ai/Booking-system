@@ -32,9 +32,37 @@ function setMode(toRegistering) {
   showMessage('');
 }
 
+// The callback redirects back here with ?error= when Google sign-in could not
+// be completed, so the reason is shown rather than silently swallowed.
+function showRedirectError() {
+  const message = new URLSearchParams(window.location.search).get('error');
+  if (message) showMessage(message);
+}
+
+// Google is offered only when the server says it is configured; a button that
+// dead-ends in a 404 is worse than no button.
+async function mountGoogle() {
+  try {
+    const { google } = await api('/api/auth/providers');
+    if (!google) return;
+    const link = document.getElementById('google-btn');
+    // Carries ?next= through Google, so a guest sent to sign in from a room
+    // page comes back to that page rather than to their trips.
+    const next = new URLSearchParams(window.location.search).get('next');
+    if (next && next.startsWith('/') && !next.startsWith('//')) {
+      link.setAttribute('href', `/api/auth/google?next=${encodeURIComponent(next)}`);
+    }
+    document.getElementById('google-row').hidden = false;
+  } catch {
+    // Leave the button hidden: password sign-in still works.
+  }
+}
+
 if (!isOwnerPortal) {
   document.getElementById('toggle').addEventListener('click', () => setMode(!registering));
   setMode(false);
+  showRedirectError();
+  mountGoogle();
 } else {
   document.getElementById('use-recovery').addEventListener('click', () => {
     const row = document.getElementById('recovery-row');

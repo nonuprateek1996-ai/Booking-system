@@ -201,6 +201,67 @@ router.get('/owner/bookings', requireOwner, (req, res) => {
   res.json({ bookings, pendingCount });
 });
 
+// --- Owner: the room calendar ---
+
+// How wide a window the calendar may ask for at once. 28 days is the default
+// view; the cap stops a hand-crafted request from selecting every booking the
+// property has ever taken.
+const CALENDAR_MAX_DAYS = 90;
+const CALENDAR_DEFAULT_DAYS = 28;
+
+function addDays(iso, days) {
+  const ms = Date.parse(`${iso}T00:00:00Z`) + days * 86400000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+// One row per room, one bar per stay. Unlike the approval inbox this is keyed
+// by date rather than by decision, so it answers "who is in which room on which
+// night" — the question the inbox cannot.
+router.get('/owner/calendar', requireOwner, (req, res) => {
+  const start = req.query.start === undefined || req.query.start === '' ? v.todayIso() : req.query.start;
+  if (!v.isRealDate(start)) {
+    return res.status(400).json({ error: 'Invalid start date' });
+  }
+  const days = req.query.days === undefined || req.query.days === '' ? CALENDAR_DEFAULT_DAYS : Number(req.query.days);
+  if (!Number.isInteger(days) || days < 1 || days > CALENDAR_MAX_DAYS) {
+    return res.status(400).json({ error: `Days must be between 1 and ${CALENDAR_MAX_DAYS}` });
+  }
+  const end = addDays(start, days);
+
+  const rooms = db
+    .prepare(
+      `SELECT id, name, price_per_night AS pricePerNight, max_guests AS maxGuests, published
+         FROM rooms ORDER BY id`
+    )
+    .all();
+
+  // Only statuses that actually hold the room are drawn. A declined or
+  // cancelled request leaves the nights free, so painting it would advertise
+  // an occupied room that is in fact bookable.
+  //
+  // The overlap test is half-open on both sides: a stay ending on the first day
+  // of the window never occupied a night inside it, and neither did one
+  // starting on the day the window ends.
+  const bookings = db
+    .prepare(
+      `SELECT b.id, b.room_id AS roomId, b.check_in AS checkIn, b.check_out AS checkOut,
+              b.guests, b.total_price AS totalPrice, b.status,
+              b.guest_note AS guestNote, b.owner_note AS ownerNote,
+              b.created_at AS createdAt, b.decided_at AS decidedAt,
+              r.name AS room,
+              u.name AS guestName, u.email AS guestEmail, u.phone AS guestPhone
+         FROM bookings b
+         JOIN rooms r ON r.id = b.room_id
+         JOIN users u ON u.id = b.guest_id
+        WHERE b.status IN ${HOLDING_STATUSES}
+          AND b.check_in < ? AND b.check_out > ?
+        ORDER BY b.room_id, b.check_in`
+    )
+    .all(end, start);
+
+  res.json({ start, days, end, rooms, bookings });
+});
+
 // Approve or decline. Only a pending request can be decided, and deciding is
 // atomic so a double-click cannot approve twice or race a decline.
 function decide(req, res, nextStatus) {
